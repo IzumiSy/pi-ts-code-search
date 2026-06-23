@@ -29,6 +29,9 @@ The extension is loaded through `package.json`:
   "pi": {
     "extensions": [
       "./extension/index.ts"
+    ],
+    "skills": [
+      "./skills"
     ]
   }
 }
@@ -75,6 +78,7 @@ For example, `getAccessToken` is tokenized roughly as `get access token`.
 - `extension/search-shared.ts` — shared types and small helpers
 - `extension/search-store.ts` — index building, caching, and import edge collection
 - `extension/search-ops.ts` — querying, ranking, importers, references, and formatting
+- `skills/ts-code-search/SKILL.md` — bundled guidance to prefer `ts_code_search_*` over `grep`/`rg` for TS/TSX search
 - `tests/code-searcher.test.ts` — cache invalidation and tool behavior tests
 
 ## Dependencies

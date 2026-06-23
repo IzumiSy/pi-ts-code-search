@@ -6,18 +6,20 @@ It uses `ts-morph` to extract symbols, `MiniSearch` to rank them in memory, and 
 
 ## What it adds
 
-This extension registers these tools:
+This package registers these tools and bundles a `ts-code-search` skill:
 
-- `ts_index_search`
+- `ts_code_search_search`
   - Search TS/TSX/JS/JSX symbols by keyword
-- `ts_index_file_outline`
+- `ts_code_search_file_outline`
   - Return indexed symbols for a single file
-- `ts_index_exports`
+- `ts_code_search_exports`
   - Return exported symbols for one file or the whole project
-- `ts_index_importers`
+- `ts_code_search_importers`
   - Find files that import or re-export a file or symbol
-- `ts_index_references`
+- `ts_code_search_references`
   - Find lightweight references for a top-level symbol
+
+It also includes a skill that nudges pi to prefer these tools over `grep`/`rg` for TypeScript and TSX code search.
 
 ## Why it exists
 
@@ -79,39 +81,39 @@ pnpm dev
 ### Search symbols
 
 ```text
-ts_index_search query="auth token"
-ts_index_search query="session manager" kind="class"
-ts_index_search query="login" limit=10
-ts_index_search query="cache invalidation" refresh=true
+ts_code_search_search query="auth token"
+ts_code_search_search query="session manager" kind="class"
+ts_code_search_search query="login" limit=10
+ts_code_search_search query="cache invalidation" refresh=true
 ```
 
 ### Outline one file
 
 ```text
-ts_index_file_outline file="src/auth.ts"
-ts_index_file_outline file="src/auth.ts" refresh=true
+ts_code_search_file_outline file="src/auth.ts"
+ts_code_search_file_outline file="src/auth.ts" refresh=true
 ```
 
 ### List exports
 
 ```text
-ts_index_exports file="src/auth.ts"
-ts_index_exports query="session"
+ts_code_search_exports file="src/auth.ts"
+ts_code_search_exports query="session"
 ```
 
 ### Find importers
 
 ```text
-ts_index_importers file="src/auth.ts"
-ts_index_importers symbol="AuthProvider"
-ts_index_importers file="src/auth.ts" symbol="AuthProvider"
+ts_code_search_importers file="src/auth.ts"
+ts_code_search_importers symbol="AuthProvider"
+ts_code_search_importers file="src/auth.ts" symbol="AuthProvider"
 ```
 
 ### Find references
 
 ```text
-ts_index_references symbol="getAccessToken" file="src/auth.ts"
-ts_index_references symbol="AuthProvider"
+ts_code_search_references symbol="getAccessToken" file="src/auth.ts"
+ts_code_search_references symbol="AuthProvider"
 ```
 
 ## Current limits

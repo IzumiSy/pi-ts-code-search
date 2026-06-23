@@ -18,6 +18,7 @@
   ],
   "files": [
     "extension",
+    "skills",
     "README.md"
   ],
   "publishConfig": {
@@ -26,6 +27,9 @@
   "pi": {
     "extensions": [
       "./extension/index.ts"
+    ],
+    "skills": [
+      "./skills"
     ]
   },
   "dependencies": {

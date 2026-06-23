@@ -141,7 +141,7 @@ This should behave like **semantic grep**, not true semantic/vector search.
 
 Minimal first set:
 
-#### `ts_index_search`
+#### `ts_code_search_search`
 Search the symbol index by natural-ish keyword query.
 
 Example inputs:
@@ -152,14 +152,14 @@ Example inputs:
 
 Returns ranked symbol hits with file, line, kind, exported flag, and a small preview.
 
-#### `ts_index_file_outline`
+#### `ts_code_search_file_outline`
 Return indexed symbols for one file.
 
 Example:
 - `{ "file": "src/auth.ts" }`
 - `{ "file": "src/auth.ts", "refresh": true }`
 
-#### `ts_index_exports`
+#### `ts_code_search_exports`
 Return export-oriented entries for a file or the whole project.
 
 Example:
@@ -168,7 +168,7 @@ Example:
 
 Optional if still cheap:
 
-#### `ts_index_related`
+#### `ts_code_search_related`
 Given a file + symbol name, return nearby/index-neighbor entries from the same file/container.
 
 ## Implementation plan
@@ -188,11 +188,11 @@ Given a file + symbol name, return nearby/index-neighbor entries from the same f
 - Tokenize names and file paths
 - Build `IndexEntry[]`
 - Build a MiniSearch index over symbol documents
-- Implement `ts_index_search`
-- Implement `ts_index_file_outline`
+- Implement `ts_code_search_search`
+- Implement `ts_code_search_file_outline`
 
 Exit condition:
-- `ts_index_search` returns useful ranked results for common symbol-name queries
+- `ts_code_search_search` returns useful ranked results for common symbol-name queries
 
 ### Phase 2: TSX-aware entries
 
@@ -213,7 +213,7 @@ Exit condition:
 - Improve MiniSearch field boosts
 - Add a small post-ranking pass for exported/default/component/hook ties
 - Add small snippets/previews
-- Add `ts_index_exports`
+- Add `ts_code_search_exports`
 
 Exit condition:
 - typical agent queries produce sensible top 5 results without manual retries
@@ -380,7 +380,7 @@ Extension behavior:
 - session shutdown can simply clear caches
 
 Tool guidance should tell the agent:
-- use `ts_index_search` for semantic TS/TSX search
+- use `ts_code_search_search` for semantic TS/TSX search
 - use `read` for exact file inspection
 - use `rg`/`grep` only for raw text/path search
 
@@ -392,7 +392,7 @@ Need:
 - tokenizer tests
 - symbol extraction tests on small fixture files
 - MiniSearch query/ranking tests for a few representative queries
-- one smoke test for `ts_index_search`
+- one smoke test for `ts_code_search_search`
 
 No need for heavy integration tests first.
 
@@ -427,8 +427,8 @@ Only add later if MVP proves useful:
 ## First milestone
 
 Ship only this:
-- `ts_index_search`
-- `ts_index_file_outline`
+- `ts_code_search_search`
+- `ts_code_search_file_outline`
 - top-level TS/TSX symbol extraction via `ts-morph`
 - tokenization
 - MiniSearch-backed ranking

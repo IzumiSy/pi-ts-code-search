@@ -74,7 +74,7 @@ afterEach(() => {
 describe("code-searcher cache invalidation", () => {
   it.each(["write", "edit", "bash"])("rebuilds after %s tool execution", async (toolName) => {
     const { tools, handlers } = createFakePi();
-    const searchTool = tools.get("ts_index_search");
+    const searchTool = tools.get("ts_code_search_search");
     const toolExecutionEndHandlers = handlers.get("tool_execution_end") ?? [];
     const cwd = makeProject("alpha");
     createdDirs.push(cwd);
@@ -95,7 +95,7 @@ describe("code-searcher cache invalidation", () => {
 
   it("rebuilds after user bash", async () => {
     const { tools, handlers } = createFakePi();
-    const searchTool = tools.get("ts_index_search");
+    const searchTool = tools.get("ts_code_search_search");
     const userBashHandlers = handlers.get("user_bash") ?? [];
     const sessionShutdownHandlers = handlers.get("session_shutdown") ?? [];
     const cwd = makeProject("gamma");
@@ -124,10 +124,10 @@ describe("code-searcher cache invalidation", () => {
   });
 });
 
-describe("ts_index_importers", () => {
+describe("ts_code_search_importers", () => {
   it("finds imports and re-exports for a file and symbol", async () => {
     const { tools } = createFakePi();
-    const importerTool = tools.get("ts_index_importers");
+    const importerTool = tools.get("ts_code_search_importers");
     const cwd = makeFilesProject({
       "src/foo.ts": "export const Foo = 1;\n",
       "src/bar.ts": 'import { Foo } from "./foo";\nexport const bar = Foo;\n',
@@ -153,8 +153,8 @@ describe("ts_index_importers", () => {
 describe("member indexing", () => {
   it("indexes class, enum, and object members", async () => {
     const { tools } = createFakePi();
-    const searchTool = tools.get("ts_index_search");
-    const outlineTool = tools.get("ts_index_file_outline");
+    const searchTool = tools.get("ts_code_search_search");
+    const outlineTool = tools.get("ts_code_search_file_outline");
     const cwd = makeFilesProject({
       "src/example.ts": `
 export class AuthService {
@@ -208,10 +208,10 @@ export const authHelpers = {
   });
 });
 
-describe("ts_index_references", () => {
+describe("ts_code_search_references", () => {
   it("finds local and imported references for a top-level symbol", async () => {
     const { tools } = createFakePi();
-    const referenceTool = tools.get("ts_index_references");
+    const referenceTool = tools.get("ts_code_search_references");
     const cwd = makeFilesProject({
       "src/foo.ts": 'export function Foo() { return 1; }\nexport function wrap() { return Foo(); }\n',
       "src/bar.ts": 'import { Foo } from "./foo";\nexport const bar = Foo();\n',
@@ -238,7 +238,7 @@ describe("ts_index_references", () => {
 describe("ignore rules", () => {
   it("respects .gitignore patterns via ignore", async () => {
     const { tools } = createFakePi();
-    const searchTool = tools.get("ts_index_search");
+    const searchTool = tools.get("ts_code_search_search");
     const cwd = makeFilesProject({
       ".gitignore": "generated/\n",
       "src/visible.ts": 'export function visible() { return true; }\n',

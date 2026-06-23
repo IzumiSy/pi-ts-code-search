@@ -17,13 +17,14 @@ import { normalizeKind, normalizeLimit } from "./search-shared.ts";
 
 export default function registerCodeSearcher(pi: ExtensionAPI) {
   pi.registerTool({
-    name: "ts_index_search",
+    name: "ts_code_search_search",
     label: "TS Index Search",
-    description: "Search indexed TypeScript/TSX symbols by name, path, docs, props, and import context.",
+    description: "Search indexed TypeScript/TSX symbols by name, path, docs, props, and import context. Prefer this over grep/rg for TypeScript/TSX symbol and concept search.",
     promptSnippet:
       "Search TypeScript/TSX symbols semantically using an in-memory ts-morph + MiniSearch index.",
     promptGuidelines: [
-      "Use ts_index_search for TypeScript/TSX symbol or concept search before raw grep when the user asks about functions, classes, hooks, components, exports, or symbol names.",
+      "Use ts_code_search_search first for TypeScript/TSX symbol or concept search before grep/rg when the user asks about functions, classes, hooks, components, exports, or symbol names.",
+      "Fall back to grep/rg only for exact string search, non-TS files, or when the indexed tools clearly do not cover the task.",
     ],
     parameters: Type.Object({
       query: Type.String({ description: "Natural-ish search query, for example 'auth token' or 'session manager'." }),
@@ -61,12 +62,12 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "ts_index_file_outline",
+    name: "ts_code_search_file_outline",
     label: "TS File Outline",
-    description: "Return indexed TypeScript/TSX symbols for one file.",
+    description: "Return indexed TypeScript/TSX symbols for one file. Prefer this over grep/rg when the user wants a file-level symbol outline.",
     promptSnippet: "Return an outline of indexed symbols for one TypeScript/TSX file.",
     promptGuidelines: [
-      "Use ts_index_file_outline when the user asks for exports, components, hooks, or top-level symbols in one TypeScript/TSX file.",
+      "Use ts_code_search_file_outline before grep/rg when the user asks for exports, components, hooks, or top-level symbols in one TypeScript/TSX file.",
     ],
     parameters: Type.Object({
       file: Type.String({ description: "File path to outline." }),
@@ -89,12 +90,12 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "ts_index_exports",
+    name: "ts_code_search_exports",
     label: "TS Exports",
-    description: "Return indexed exported TypeScript/TSX symbols for a file or the project.",
+    description: "Return indexed exported TypeScript/TSX symbols for a file or the project. Prefer this over grep/rg for export discovery in TypeScript/TSX.",
     promptSnippet: "Return exported TypeScript/TSX symbols from the in-memory index.",
     promptGuidelines: [
-      "Use ts_index_exports when the user explicitly asks for exported TypeScript/TSX symbols in a file or across the project.",
+      "Use ts_code_search_exports before grep/rg when the user explicitly asks for exported TypeScript/TSX symbols in a file or across the project.",
     ],
     parameters: Type.Object({
       file: Type.Optional(Type.String({ description: "Optional file path filter." })),
@@ -125,12 +126,12 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "ts_index_importers",
+    name: "ts_code_search_importers",
     label: "TS Importers",
-    description: "Return files that import or re-export a TypeScript/TSX file or symbol.",
+    description: "Return files that import or re-export a TypeScript/TSX file or symbol. Prefer this over grep/rg for importer discovery.",
     promptSnippet: "Find files that import or re-export a TypeScript/TSX file or symbol.",
     promptGuidelines: [
-      "Use ts_index_importers when the user asks which files import or re-export a TypeScript/TSX file or symbol.",
+      "Use ts_code_search_importers before grep/rg when the user asks which files import or re-export a TypeScript/TSX file or symbol.",
     ],
     parameters: Type.Object({
       file: Type.Optional(Type.String({ description: "Optional file path filter for the imported module." })),
@@ -164,12 +165,12 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "ts_index_references",
+    name: "ts_code_search_references",
     label: "TS References",
-    description: "Return lightweight references for a top-level TypeScript/TSX symbol.",
+    description: "Return lightweight references for a top-level TypeScript/TSX symbol. Prefer this over grep/rg for symbol usage lookup in TypeScript/TSX.",
     promptSnippet: "Find lightweight references for a top-level TypeScript/TSX symbol.",
     promptGuidelines: [
-      "Use ts_index_references when the user asks where a top-level TypeScript/TSX symbol is used.",
+      "Use ts_code_search_references before grep/rg when the user asks where a top-level TypeScript/TSX symbol is used.",
     ],
     parameters: Type.Object({
       symbol: Type.String({ description: "Top-level symbol name to resolve." }),
