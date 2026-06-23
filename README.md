@@ -29,25 +29,7 @@ This is for questions like:
 - "Find cache invalidation hooks"
 - "List exports in this file"
 
-## How it works
-
-1. If `tsconfig.json` exists, build a `ts-morph` `Project` from it
-2. Otherwise, fall back to globbing `*.ts`, `*.tsx`, `*.js`, `*.jsx`
-3. Extract top-level declarations plus common members (methods, properties, enum members)
-4. Build an in-memory `MiniSearch` index
-5. Apply a small post-ranking pass for code-aware relevance
-
-Ignored by default:
-
-- `node_modules`
-- `dist`
-- `build`
-- `coverage`
-- `.next`
-- `.turbo`
-- `*.d.ts`
-
-Plus patterns from the repo `.gitignore`, using gitignore semantics via `ignore`.
+For implementation details and contributor notes, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ## Indexed symbol kinds
 
@@ -91,17 +73,6 @@ Start pi with the extension enabled, while disabling globally installed extensio
 pnpm dev
 ```
 
-The package is wired through `package.json`:
-
-```json
-{
-  "pi": {
-    "extensions": [
-      "./extension/index.ts"
-    ]
-  }
-}
-```
 
 ## Tool examples
 
@@ -143,20 +114,6 @@ ts_index_references symbol="getAccessToken" file="src/auth.ts"
 ts_index_references symbol="AuthProvider"
 ```
 
-## Ranking signals
-
-Results are mainly ranked by:
-
-- symbol name
-- file path tokens
-- JSDoc tokens
-- prop-like tokens
-- import module tokens
-- export/default-export status
-- component/hook kind matches
-
-For example, `getAccessToken` is tokenized roughly as `get access token`.
-
 ## Current limits
 
 This is intentionally small.
@@ -169,26 +126,6 @@ It does **not** try to do:
 - file watching
 - vector search
 - multi-language indexing
-
-The index is cached **per cwd in memory**. Use `refresh=true` when you want a rebuild.
-
-## Development
-
-Current implementation lives mostly in:
-
-- `extension/index.ts`
-
-Dependencies:
-
-- `ts-morph`
-- `minisearch`
-- `ignore`
-- `typescript`
-
-Peer dependencies:
-
-- `@earendil-works/pi-ai`
-- `@earendil-works/pi-coding-agent`
 
 ## License
 
