@@ -76,7 +76,7 @@ pnpm install
 
 ## Run
 
-Start pi with the extension enabled:
+Start pi with the extension enabled, while disabling globally installed extensions to avoid conflicts:
 
 ```bash
 pnpm dev
