@@ -15,6 +15,7 @@ import {
   type SearchKind,
   type SearchScoreContribution,
   type SearchStore,
+  type SearchStoreBuildTimings,
 } from "./search-shared.ts";
 
 export function searchEntries(
@@ -419,12 +420,26 @@ function matchesRequestedFile(actualFile: string, cwd: string, requestedFile: st
   );
 }
 
-export function formatSearchResults(query: string, hits: SearchHit[], explain = false): string {
+export function formatSearchResults(
+  query: string,
+  hits: SearchHit[],
+  explain = false,
+  timings?: SearchStoreBuildTimings,
+): string {
+  const timingLine = explain && timings ? formatTimingLine(timings) : undefined;
+
   if (hits.length === 0) {
-    return `No TS/TSX symbol matches for "${query}".`;
+    return [
+      `No TS/TSX symbol matches for "${query}".`,
+      timingLine,
+    ].filter(Boolean).join("\n");
   }
 
-  return [`${hits.length} TS/TSX symbol matches for "${query}":`, ...hits.map((hit, index) => formatHit(hit, index, explain))].join("\n");
+  return [
+    `${hits.length} TS/TSX symbol matches for "${query}":`,
+    ...hits.map((hit, index) => formatHit(hit, index, explain)),
+    timingLine,
+  ].filter(Boolean).join("\n");
 }
 
 export function formatOutlineResults(file: string, entries: IndexEntry[]): string {
@@ -512,4 +527,8 @@ function formatScore(value: number): string {
 function formatSignedScore(value: number): string {
   const formatted = formatScore(value);
   return value >= 0 ? `+${formatted}` : formatted;
+}
+
+function formatTimingLine(timings: SearchStoreBuildTimings): string {
+  return `timing total=${formatScore(timings.totalMs)}ms createProject=${formatScore(timings.createProjectMs)}ms collectIndexData=${formatScore(timings.collectIndexDataMs)}ms entries=${formatScore(timings.collectEntriesMs)}ms importEdges=${formatScore(timings.collectImportEdgesMs)}ms addSearchDocuments=${formatScore(timings.addSearchDocumentsMs)}ms`;
 }

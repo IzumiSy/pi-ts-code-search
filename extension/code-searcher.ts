@@ -50,7 +50,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain)) }],
+        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,

@@ -394,6 +394,7 @@ export function useAutoLogin() {
     );
     expect(result.content?.[0]?.text).toContain("score ");
     expect(result.content?.[0]?.text).toContain("MiniSearch base");
+    expect(result.content?.[0]?.text).toContain("timing total=");
   });
 });
 
