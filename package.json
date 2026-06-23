@@ -1,5 +1,5 @@
 {
-  "name": "@izumisy/pi-code-search",
+  "name": "@izumisy/pi-ts-code-search",
   "version": "0.1.0",
   "description": "pi extension for TypeScript/TSX symbol search with ts-morph and MiniSearch",
   "license": "MIT",

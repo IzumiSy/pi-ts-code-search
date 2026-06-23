@@ -1,4 +1,4 @@
-# pi-code-search
+# pi-ts-code-search
 
 A **pi extension** for TypeScript/TSX-oriented code search.
 

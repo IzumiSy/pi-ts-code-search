@@ -39,7 +39,7 @@ function createFakePi() {
 }
 
 function makeProject(functionName: string) {
-  const cwd = mkdtempSync(join(tmpdir(), "pi-code-search-"));
+  const cwd = mkdtempSync(join(tmpdir(), "pi-ts-code-search-"));
   const srcDir = join(cwd, "src");
   mkdirSync(srcDir, { recursive: true });
   writeFileSync(join(srcDir, "example.ts"), `export function ${functionName}() { return "${functionName}"; }\n`);
