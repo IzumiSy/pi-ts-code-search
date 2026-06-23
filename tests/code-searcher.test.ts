@@ -130,6 +130,7 @@ describe("code-searcher cache invalidation", () => {
         totalMs: expect.any(Number),
         createProjectMs: expect.any(Number),
         createIgnoreMatcherMs: expect.any(Number),
+        collectIndexDataMs: expect.any(Number),
         collectEntriesMs: expect.any(Number),
         collectImportEdgesMs: expect.any(Number),
         addSearchDocumentsMs: expect.any(Number),

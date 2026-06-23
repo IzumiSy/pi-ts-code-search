@@ -69,15 +69,13 @@ function buildStore(cwd: string): SearchStore {
   const ignoreMatcher = createIgnoreMatcher(cwd);
   const createIgnoreMatcherMs = elapsedMs(createIgnoreMatcherStartedAt);
 
-  const collectEntriesStartedAt = performance.now();
-  const entries = collectEntries(project, cwd, ignoreMatcher);
-  const collectEntriesMs = elapsedMs(collectEntriesStartedAt);
+  const { entries, importEdges, collectIndexDataMs, collectEntriesMs, collectImportEdgesMs } = collectIndexData(
+    project,
+    cwd,
+    ignoreMatcher,
+  );
 
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
-
-  const collectImportEdgesStartedAt = performance.now();
-  const importEdges = collectImportEdges(project, cwd, ignoreMatcher);
-  const collectImportEdgesMs = elapsedMs(collectImportEdgesStartedAt);
 
   const search = new MiniSearch<SearchDocument>({
     fields: ["nameText", "pathText", "jsDocText", "propText", "importText", "text"],
@@ -100,6 +98,7 @@ function buildStore(cwd: string): SearchStore {
       totalMs: elapsedMs(buildStartedAt),
       createProjectMs,
       createIgnoreMatcherMs,
+      collectIndexDataMs,
       collectEntriesMs,
       collectImportEdgesMs,
       addSearchDocumentsMs,
@@ -108,7 +107,11 @@ function buildStore(cwd: string): SearchStore {
 }
 
 function elapsedMs(startedAt: number): number {
-  return Math.round((performance.now() - startedAt) * 100) / 100;
+  return roundMs(performance.now() - startedAt);
+}
+
+function roundMs(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function createProject(cwd: string): Project {
@@ -147,8 +150,12 @@ export function createIgnoreMatcher(cwd: string) {
   return matcher;
 }
 
-function collectEntries(project: Project, cwd: string, ignoreMatcher: ReturnType<typeof ignore>): IndexEntry[] {
+function collectIndexData(project: Project, cwd: string, ignoreMatcher: ReturnType<typeof ignore>) {
+  const collectIndexDataStartedAt = performance.now();
   const entries: IndexEntry[] = [];
+  const importEdges: ImportEdge[] = [];
+  let collectEntriesMs = 0;
+  let collectImportEdgesMs = 0;
 
   for (const source of project.getSourceFiles()) {
     if (!shouldIndexSourceFile(cwd, source, ignoreMatcher)) {
@@ -157,223 +164,16 @@ function collectEntries(project: Project, cwd: string, ignoreMatcher: ReturnType
 
     const importTokens = collectImportTokens(source);
 
-    for (const fn of source.getFunctions()) {
-      const name = fn.getName() ?? (fn.isDefaultExport() ? "default" : undefined);
-      if (!name) {
-        continue;
-      }
+    const collectSourceEntriesStartedAt = performance.now();
+    entries.push(...collectSourceEntries(source, cwd, importTokens));
+    collectEntriesMs += performance.now() - collectSourceEntriesStartedAt;
 
-      const jsDoc = readJsDoc(fn);
-      const propTokens = collectFunctionPropTokens(fn);
-      entries.push(
-        createEntry({
-          cwd,
-          source,
-          node: fn,
-          name,
-          kind: classifyFunction(name, fn),
-          exported: fn.isExported(),
-          defaultExport: fn.isDefaultExport(),
-          importTokens,
-          jsDocText: jsDoc.text,
-          jsDocTokens: jsDoc.tokens,
-          propTokens,
-        }),
-      );
-    }
-
-    for (const cls of source.getClasses()) {
-      const name = cls.getName() ?? (cls.isDefaultExport() ? "default" : undefined);
-      if (!name) {
-        continue;
-      }
-
-      const jsDoc = readJsDoc(cls);
-      entries.push(
-        createEntry({
-          cwd,
-          source,
-          node: cls,
-          name,
-          kind: "class",
-          exported: cls.isExported(),
-          defaultExport: cls.isDefaultExport(),
-          importTokens,
-          jsDocText: jsDoc.text,
-          jsDocTokens: jsDoc.tokens,
-          propTokens: [],
-        }),
-      );
-
-      for (const method of cls.getMethods()) {
-        const methodJsDoc = readJsDoc(method);
-        entries.push(
-          createEntry({
-            cwd,
-            source,
-            node: method,
-            name: method.getName(),
-            kind: "method",
-            exported: false,
-            defaultExport: false,
-            container: name,
-            importTokens,
-            jsDocText: methodJsDoc.text,
-            jsDocTokens: methodJsDoc.tokens,
-            propTokens: collectFunctionPropTokens(method),
-          }),
-        );
-      }
-
-      for (const property of cls.getProperties()) {
-        const propertyJsDoc = readJsDoc(property);
-        entries.push(
-          createEntry({
-            cwd,
-            source,
-            node: property,
-            name: property.getName(),
-            kind: "property",
-            exported: false,
-            defaultExport: false,
-            container: name,
-            importTokens,
-            jsDocText: propertyJsDoc.text,
-            jsDocTokens: propertyJsDoc.tokens,
-            propTokens: [],
-          }),
-        );
-      }
-    }
-
-    for (const iface of source.getInterfaces()) {
-      const name = iface.getName();
-      const jsDoc = readJsDoc(iface);
-      entries.push(
-        createEntry({
-          cwd,
-          source,
-          node: iface,
-          name,
-          kind: "interface",
-          exported: iface.isExported(),
-          defaultExport: iface.isDefaultExport(),
-          importTokens,
-          jsDocText: jsDoc.text,
-          jsDocTokens: jsDoc.tokens,
-          propTokens: [],
-        }),
-      );
-    }
-
-    for (const typeAlias of source.getTypeAliases()) {
-      const name = typeAlias.getName();
-      const jsDoc = readJsDoc(typeAlias);
-      entries.push(
-        createEntry({
-          cwd,
-          source,
-          node: typeAlias,
-          name,
-          kind: "type",
-          exported: typeAlias.isExported(),
-          defaultExport: typeAlias.isDefaultExport(),
-          importTokens,
-          jsDocText: jsDoc.text,
-          jsDocTokens: jsDoc.tokens,
-          propTokens: [],
-        }),
-      );
-    }
-
-    for (const enumDecl of source.getEnums()) {
-      const name = enumDecl.getName();
-      const jsDoc = readJsDoc(enumDecl);
-      entries.push(
-        createEntry({
-          cwd,
-          source,
-          node: enumDecl,
-          name,
-          kind: "enum",
-          exported: enumDecl.isExported(),
-          defaultExport: enumDecl.isDefaultExport(),
-          importTokens,
-          jsDocText: jsDoc.text,
-          jsDocTokens: jsDoc.tokens,
-          propTokens: [],
-        }),
-      );
-
-      for (const member of enumDecl.getMembers()) {
-        entries.push(
-          createEntry({
-            cwd,
-            source,
-            node: member,
-            name: member.getName(),
-            kind: "enum-member",
-            exported: false,
-            defaultExport: false,
-            container: name,
-            importTokens,
-            jsDocText: "",
-            jsDocTokens: [],
-            propTokens: [],
-          }),
-        );
-      }
-    }
-
-    for (const statement of source.getVariableStatements()) {
-      const jsDoc = readJsDoc(statement);
-      for (const declaration of statement.getDeclarations()) {
-        const nameNode = declaration.getNameNode();
-        if (!Node.isIdentifier(nameNode)) {
-          continue;
-        }
-
-        const name = nameNode.getText();
-        const propTokens = collectVariablePropTokens(declaration);
-        entries.push(
-          createEntry({
-            cwd,
-            source,
-            node: declaration,
-            name,
-            kind: classifyVariable(name, declaration, statement.getDeclarationKind()),
-            exported: statement.isExported(),
-            defaultExport: statement.isDefaultExport(),
-            importTokens,
-            jsDocText: jsDoc.text,
-            jsDocTokens: jsDoc.tokens,
-            propTokens,
-          }),
-        );
-
-        for (const member of collectObjectMembers(declaration)) {
-          entries.push(
-            createEntry({
-              cwd,
-              source,
-              node: member.node,
-              name: member.name,
-              kind: member.kind,
-              exported: false,
-              defaultExport: false,
-              container: name,
-              importTokens,
-              jsDocText: "",
-              jsDocTokens: [],
-              propTokens: member.propTokens,
-            }),
-          );
-        }
-      }
-    }
+    const collectSourceImportEdgesStartedAt = performance.now();
+    importEdges.push(...collectSourceImportEdges(source, cwd));
+    collectImportEdgesMs += performance.now() - collectSourceImportEdgesStartedAt;
   }
 
-  return entries.sort((a, b) => {
+  entries.sort((a, b) => {
     if (a.file !== b.file) {
       return a.file.localeCompare(b.file);
     }
@@ -382,6 +182,242 @@ function collectEntries(project: Project, cwd: string, ignoreMatcher: ReturnType
     }
     return a.column - b.column;
   });
+
+  importEdges.sort(
+    (a, b) =>
+      a.importerFile.localeCompare(b.importerFile) ||
+      a.importerLine - b.importerLine ||
+      a.importerColumn - b.importerColumn,
+  );
+
+  return {
+    entries,
+    importEdges,
+    collectIndexDataMs: elapsedMs(collectIndexDataStartedAt),
+    collectEntriesMs: roundMs(collectEntriesMs),
+    collectImportEdgesMs: roundMs(collectImportEdgesMs),
+  };
+}
+
+function collectSourceEntries(source: SourceFile, cwd: string, importTokens: string[]): IndexEntry[] {
+  const entries: IndexEntry[] = [];
+
+  for (const fn of source.getFunctions()) {
+    const name = fn.getName() ?? (fn.isDefaultExport() ? "default" : undefined);
+    if (!name) {
+      continue;
+    }
+
+    const jsDoc = readJsDoc(fn);
+    const propTokens = collectFunctionPropTokens(fn);
+    entries.push(
+      createEntry({
+        cwd,
+        source,
+        node: fn,
+        name,
+        kind: classifyFunction(name, fn),
+        exported: fn.isExported(),
+        defaultExport: fn.isDefaultExport(),
+        importTokens,
+        jsDocText: jsDoc.text,
+        jsDocTokens: jsDoc.tokens,
+        propTokens,
+      }),
+    );
+  }
+
+  for (const cls of source.getClasses()) {
+    const name = cls.getName() ?? (cls.isDefaultExport() ? "default" : undefined);
+    if (!name) {
+      continue;
+    }
+
+    const jsDoc = readJsDoc(cls);
+    entries.push(
+      createEntry({
+        cwd,
+        source,
+        node: cls,
+        name,
+        kind: "class",
+        exported: cls.isExported(),
+        defaultExport: cls.isDefaultExport(),
+        importTokens,
+        jsDocText: jsDoc.text,
+        jsDocTokens: jsDoc.tokens,
+        propTokens: [],
+      }),
+    );
+
+    for (const method of cls.getMethods()) {
+      const methodJsDoc = readJsDoc(method);
+      entries.push(
+        createEntry({
+          cwd,
+          source,
+          node: method,
+          name: method.getName(),
+          kind: "method",
+          exported: false,
+          defaultExport: false,
+          container: name,
+          importTokens,
+          jsDocText: methodJsDoc.text,
+          jsDocTokens: methodJsDoc.tokens,
+          propTokens: collectFunctionPropTokens(method),
+        }),
+      );
+    }
+
+    for (const property of cls.getProperties()) {
+      const propertyJsDoc = readJsDoc(property);
+      entries.push(
+        createEntry({
+          cwd,
+          source,
+          node: property,
+          name: property.getName(),
+          kind: "property",
+          exported: false,
+          defaultExport: false,
+          container: name,
+          importTokens,
+          jsDocText: propertyJsDoc.text,
+          jsDocTokens: propertyJsDoc.tokens,
+          propTokens: [],
+        }),
+      );
+    }
+  }
+
+  for (const iface of source.getInterfaces()) {
+    const name = iface.getName();
+    const jsDoc = readJsDoc(iface);
+    entries.push(
+      createEntry({
+        cwd,
+        source,
+        node: iface,
+        name,
+        kind: "interface",
+        exported: iface.isExported(),
+        defaultExport: iface.isDefaultExport(),
+        importTokens,
+        jsDocText: jsDoc.text,
+        jsDocTokens: jsDoc.tokens,
+        propTokens: [],
+      }),
+    );
+  }
+
+  for (const typeAlias of source.getTypeAliases()) {
+    const name = typeAlias.getName();
+    const jsDoc = readJsDoc(typeAlias);
+    entries.push(
+      createEntry({
+        cwd,
+        source,
+        node: typeAlias,
+        name,
+        kind: "type",
+        exported: typeAlias.isExported(),
+        defaultExport: typeAlias.isDefaultExport(),
+        importTokens,
+        jsDocText: jsDoc.text,
+        jsDocTokens: jsDoc.tokens,
+        propTokens: [],
+      }),
+    );
+  }
+
+  for (const enumDecl of source.getEnums()) {
+    const name = enumDecl.getName();
+    const jsDoc = readJsDoc(enumDecl);
+    entries.push(
+      createEntry({
+        cwd,
+        source,
+        node: enumDecl,
+        name,
+        kind: "enum",
+        exported: enumDecl.isExported(),
+        defaultExport: enumDecl.isDefaultExport(),
+        importTokens,
+        jsDocText: jsDoc.text,
+        jsDocTokens: jsDoc.tokens,
+        propTokens: [],
+      }),
+    );
+
+    for (const member of enumDecl.getMembers()) {
+      entries.push(
+        createEntry({
+          cwd,
+          source,
+          node: member,
+          name: member.getName(),
+          kind: "enum-member",
+          exported: false,
+          defaultExport: false,
+          container: name,
+          importTokens,
+          jsDocText: "",
+          jsDocTokens: [],
+          propTokens: [],
+        }),
+      );
+    }
+  }
+
+  for (const statement of source.getVariableStatements()) {
+    const jsDoc = readJsDoc(statement);
+    for (const declaration of statement.getDeclarations()) {
+      const nameNode = declaration.getNameNode();
+      if (!Node.isIdentifier(nameNode)) {
+        continue;
+      }
+
+      const name = nameNode.getText();
+      const propTokens = collectVariablePropTokens(declaration);
+      entries.push(
+        createEntry({
+          cwd,
+          source,
+          node: declaration,
+          name,
+          kind: classifyVariable(name, declaration, statement.getDeclarationKind()),
+          exported: statement.isExported(),
+          defaultExport: statement.isDefaultExport(),
+          importTokens,
+          jsDocText: jsDoc.text,
+          jsDocTokens: jsDoc.tokens,
+          propTokens,
+        }),
+      );
+
+      for (const member of collectObjectMembers(declaration)) {
+        entries.push(
+          createEntry({
+            cwd,
+            source,
+            node: member.node,
+            name: member.name,
+            kind: member.kind,
+            exported: false,
+            defaultExport: false,
+            container: name,
+            importTokens,
+            jsDocText: "",
+            jsDocTokens: [],
+            propTokens: member.propTokens,
+          }),
+        );
+      }
+    }
+  }
+
+  return entries;
 }
 
 export function shouldIndexSourceFile(cwd: string, source: SourceFile, ignoreMatcher: ReturnType<typeof ignore>): boolean {
@@ -400,35 +436,24 @@ export function shouldIndexSourceFile(cwd: string, source: SourceFile, ignoreMat
   return !ignoreMatcher.ignores(relative);
 }
 
-function collectImportEdges(project: Project, cwd: string, ignoreMatcher: ReturnType<typeof ignore>): ImportEdge[] {
+function collectSourceImportEdges(source: SourceFile, cwd: string): ImportEdge[] {
   const edges: ImportEdge[] = [];
 
-  for (const source of project.getSourceFiles()) {
-    if (!shouldIndexSourceFile(cwd, source, ignoreMatcher)) {
-      continue;
-    }
-
-    for (const declaration of source.getImportDeclarations()) {
-      const edge = createImportEdge(cwd, source, declaration, "import");
-      if (edge) {
-        edges.push(edge);
-      }
-    }
-
-    for (const declaration of source.getExportDeclarations()) {
-      const edge = createImportEdge(cwd, source, declaration, "re-export");
-      if (edge) {
-        edges.push(edge);
-      }
+  for (const declaration of source.getImportDeclarations()) {
+    const edge = createImportEdge(cwd, source, declaration, "import");
+    if (edge) {
+      edges.push(edge);
     }
   }
 
-  return edges.sort(
-    (a, b) =>
-      a.importerFile.localeCompare(b.importerFile) ||
-      a.importerLine - b.importerLine ||
-      a.importerColumn - b.importerColumn,
-  );
+  for (const declaration of source.getExportDeclarations()) {
+    const edge = createImportEdge(cwd, source, declaration, "re-export");
+    if (edge) {
+      edges.push(edge);
+    }
+  }
+
+  return edges;
 }
 
 function createImportEdge(

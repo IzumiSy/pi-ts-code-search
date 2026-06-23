@@ -92,6 +92,7 @@ export interface SearchStoreBuildTimings {
   totalMs: number;
   createProjectMs: number;
   createIgnoreMatcherMs: number;
+  collectIndexDataMs: number;
   collectEntriesMs: number;
   collectImportEdgesMs: number;
   addSearchDocumentsMs: number;
