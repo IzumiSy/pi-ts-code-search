@@ -71,7 +71,10 @@ For example, `getAccessToken` is tokenized roughly as `get access token`.
 ## Code layout
 
 - `extension/index.ts` — extension entrypoint
-- `extension/code-searcher.ts` — tool registration, indexing, ranking, importers, references
+- `extension/code-searcher.ts` — tool registration and cache invalidation hooks
+- `extension/search-shared.ts` — shared types and small helpers
+- `extension/search-store.ts` — index building, caching, and import edge collection
+- `extension/search-ops.ts` — querying, ranking, importers, references, and formatting
 - `tests/code-searcher.test.ts` — cache invalidation and tool behavior tests
 
 ## Dependencies
