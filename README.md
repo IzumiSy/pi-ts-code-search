@@ -78,6 +78,7 @@ pi
 ts_code_search_search query="auth token"
 ts_code_search_search query="session manager" kind="class"
 ts_code_search_search query="login" limit=10
+ts_code_search_search query="autoLogin" explain=true
 ts_code_search_search query="cache invalidation" refresh=true
 ```
 

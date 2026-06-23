@@ -13,12 +13,13 @@ import {
   type ReferenceHit,
   type SearchHit,
   type SearchKind,
+  type SearchScoreContribution,
   type SearchStore,
 } from "./search-shared.ts";
 
 export function searchEntries(
   store: SearchStore,
-  options: { query: string; kind?: SearchKind; file?: string; limit: number },
+  options: { query: string; kind?: SearchKind; file?: string; limit: number; explain?: boolean },
 ): SearchHit[] {
   const normalizedQuery = normalizeQuery(options.query);
   if (!normalizedQuery) {
@@ -26,17 +27,11 @@ export function searchEntries(
   }
 
   const queryTokens = tokenize(options.query);
-  const results = store.search.search(normalizedQuery, {
-    prefix: true,
-    boost: {
-      nameText: 5,
-      pathText: 2,
-      jsDocText: 1.5,
-      propText: 1.5,
-      importText: 1,
-      text: 1,
-    },
-  });
+  const strictIdentifierSearch = shouldUseStrictIdentifierSearch(options.query, queryTokens);
+  const primaryResults = store.search.search(normalizedQuery, getSearchOptions(strictIdentifierSearch));
+  const results = strictIdentifierSearch && primaryResults.length === 0
+    ? store.search.search(normalizedQuery, getSearchOptions(false))
+    : primaryResults;
 
   return results
     .map((result) => {
@@ -51,9 +46,12 @@ export function searchEntries(
         return undefined;
       }
 
+      const ranked = rankEntry(entry, result.score, options.query, queryTokens, options.kind, Boolean(options.explain));
+
       return {
         entry,
-        score: rankEntry(entry, result.score, options.query, queryTokens, options.kind),
+        score: ranked.score,
+        scoreBreakdown: ranked.scoreBreakdown,
       };
     })
     .filter((hit): hit is SearchHit => Boolean(hit))
@@ -260,7 +258,8 @@ function rankEntry(
   rawQuery: string,
   queryTokens: string[],
   desiredKind?: SearchKind,
-): number {
+  explain = false,
+): { score: number; scoreBreakdown?: SearchScoreContribution[] } {
   const entryTokens = new Set([
     ...entry.nameTokens,
     ...entry.containerTokens,
@@ -270,39 +269,91 @@ function rankEntry(
     ...entry.importTokens,
   ]);
   const queryKind = detectKindFromQuery(queryTokens);
+  const strictIdentifierSearch = shouldUseStrictIdentifierSearch(rawQuery, queryTokens);
+  const scoreBreakdown = explain ? [{ label: "MiniSearch base", value: baseScore }] : undefined;
   let score = baseScore;
 
   if (compactText(entry.name) === compactText(rawQuery) || compactText(entry.qualifiedName) === compactText(rawQuery)) {
-    score += 100;
+    score += addScore(scoreBreakdown, "exact identifier match", 100);
   }
   if (
     queryTokens.length > 0 &&
     queryTokens.every((token) => [...entry.nameTokens, ...entry.containerTokens].includes(token))
   ) {
-    score += 30;
+    score += addScore(scoreBreakdown, "all query tokens in name/container", 30);
+  }
+  if (strictIdentifierSearch && endsWithTokens(entry.nameTokens, queryTokens)) {
+    score += addScore(scoreBreakdown, "identifier suffix match", 20, entry.name);
   }
 
-  score += queryTokens.filter((token) => entryTokens.has(token)).length * 4;
+  const matchedTokens = queryTokens.filter((token) => entryTokens.has(token));
+  if (matchedTokens.length > 0) {
+    score += addScore(scoreBreakdown, "matched query tokens", matchedTokens.length * 4, matchedTokens.join(", "));
+  }
   if (entry.exported) {
-    score += 8;
+    score += addScore(scoreBreakdown, "exported", 8);
   }
   if (entry.defaultExport) {
-    score += 6;
+    score += addScore(scoreBreakdown, "default export", 6);
   }
   if (desiredKind && entry.kind === desiredKind) {
-    score += 8;
+    score += addScore(scoreBreakdown, "requested kind match", 8, desiredKind);
   }
   if (queryKind && entry.kind === queryKind) {
-    score += 8;
+    score += addScore(scoreBreakdown, "query kind hint match", 8, queryKind);
   }
   if (queryTokens.includes("component") && entry.kind === "component") {
-    score += 8;
+    score += addScore(scoreBreakdown, '"component" query bonus', 8);
   }
   if (queryTokens.includes("hook") && entry.kind === "hook") {
-    score += 8;
+    score += addScore(scoreBreakdown, '"hook" query bonus', 8);
   }
 
-  return score;
+  return { score, scoreBreakdown };
+}
+
+function addScore(
+  scoreBreakdown: SearchScoreContribution[] | undefined,
+  label: string,
+  value: number,
+  detail?: string,
+): number {
+  if (scoreBreakdown && value !== 0) {
+    scoreBreakdown.push({ label, value, detail });
+  }
+  return value;
+}
+
+function getSearchOptions(strictIdentifierSearch: boolean) {
+  return {
+    prefix: !strictIdentifierSearch,
+    combineWith: strictIdentifierSearch ? "AND" : "OR",
+    boost: {
+      nameText: 5,
+      pathText: 2,
+      jsDocText: 1.5,
+      propText: 1.5,
+      importText: 1,
+      text: 1,
+    },
+  } as const;
+}
+
+function shouldUseStrictIdentifierSearch(rawQuery: string, queryTokens: string[]): boolean {
+  const trimmed = rawQuery.trim();
+  return (
+    queryTokens.length >= 2 &&
+    !/\s/.test(trimmed) &&
+    (/[._\-/]/.test(trimmed) || /[a-z0-9][A-Z]/.test(trimmed) || /[A-Z]+[A-Z][a-z]/.test(trimmed))
+  );
+}
+
+function endsWithTokens(value: string[], suffix: string[]): boolean {
+  if (suffix.length === 0 || suffix.length > value.length) {
+    return false;
+  }
+
+  return suffix.every((token, index) => value[value.length - suffix.length + index] === token);
 }
 
 function detectKindFromQuery(tokens: string[]): SearchKind | undefined {
@@ -365,12 +416,12 @@ function matchesRequestedFile(actualFile: string, cwd: string, requestedFile: st
   );
 }
 
-export function formatSearchResults(query: string, hits: SearchHit[]): string {
+export function formatSearchResults(query: string, hits: SearchHit[], explain = false): string {
   if (hits.length === 0) {
     return `No TS/TSX symbol matches for "${query}".`;
   }
 
-  return [`${hits.length} TS/TSX symbol matches for "${query}":`, ...hits.map(formatHit)].join("\n");
+  return [`${hits.length} TS/TSX symbol matches for "${query}":`, ...hits.map((hit, index) => formatHit(hit, index, explain))].join("\n");
 }
 
 export function formatOutlineResults(file: string, entries: IndexEntry[]): string {
@@ -416,8 +467,13 @@ export function formatReferenceResults(symbol: string, file: string | undefined,
   return [`${hits.length} TS/TSX references for ${target}:`, ...hits.map(formatReferenceHit)].join("\n");
 }
 
-function formatHit(hit: SearchHit, index: number): string {
-  return formatEntryLine(hit.entry, index + 1);
+function formatHit(hit: SearchHit, index: number, explain = false): string {
+  const line = formatEntryLine(hit.entry, index + 1);
+  if (!explain || !hit.scoreBreakdown || hit.scoreBreakdown.length === 0) {
+    return line;
+  }
+
+  return `${line}\n   score ${formatScore(hit.score)} = ${formatScoreBreakdown(hit.scoreBreakdown)}`;
 }
 
 function formatEntryLine(entry: IndexEntry, index?: number): string {
@@ -438,4 +494,19 @@ function formatImportEdge(edge: ImportEdge, index: number): string {
 
 function formatReferenceHit(hit: ReferenceHit, index: number): string {
   return `${index + 1}. ${hit.file}:${hit.line} [${hit.kind}] <- ${hit.declarationName} @ ${hit.declarationFile} — ${hit.preview}`;
+}
+
+function formatScoreBreakdown(scoreBreakdown: SearchScoreContribution[]): string {
+  return scoreBreakdown
+    .map((part) => `${part.label} ${formatSignedScore(part.value)}${part.detail ? ` (${part.detail})` : ""}`)
+    .join("; ");
+}
+
+function formatScore(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatSignedScore(value: number): string {
+  const formatted = formatScore(value);
+  return value >= 0 ? `+${formatted}` : formatted;
 }

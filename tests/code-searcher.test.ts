@@ -235,6 +235,99 @@ describe("ts_code_search_references", () => {
   });
 });
 
+describe("identifier-like search ranking", () => {
+  it("keeps camelCase symbol queries focused", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_code_search_search");
+    const cwd = makeFilesProject({
+      "src/auth.ts": `
+export function useAutoLogin() {
+  return true;
+}
+
+export function autoMatchHeaders() {
+  return [];
+}
+`,
+      "src/sidebar.tsx": `
+export function AutoSidebar() {
+  return null;
+}
+`,
+      "src/autocomplete.tsx": `
+export function AutocompleteRoot() {
+  return null;
+}
+`,
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+
+    const result = await searchTool!.execute("tool-call", { query: "autoLogin", limit: 10 }, undefined, undefined, { cwd });
+    const hits = (result.details as any).hits;
+
+    expect(hits.map((hit: any) => hit.qualifiedName)).toEqual(["useAutoLogin"]);
+  });
+
+  it("falls back to broader search when strict identifier matching finds nothing", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_code_search_search");
+    const cwd = makeFilesProject({
+      "src/autocomplete.tsx": `
+export function AutocompleteRoot() {
+  return null;
+}
+`,
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+
+    const result = await searchTool!.execute("tool-call", { query: "autoComplete", limit: 10 }, undefined, undefined, { cwd });
+    const hits = (result.details as any).hits;
+
+    expect(hits[0].qualifiedName).toBe("AutocompleteRoot");
+  });
+
+  it("returns score breakdowns when explain=true", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_code_search_search");
+    const cwd = makeFilesProject({
+      "src/auth.ts": `
+export function useAutoLogin() {
+  return true;
+}
+`,
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+
+    const result: any = await searchTool!.execute(
+      "tool-call",
+      { query: "autoLogin", limit: 10, explain: true },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    const [firstHit] = result.details.hits;
+
+    expect(result.details.explain).toBe(true);
+    expect(firstHit.scoreBreakdown).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "MiniSearch base" }),
+        expect.objectContaining({ label: "all query tokens in name/container", value: 30 }),
+        expect.objectContaining({ label: "identifier suffix match", value: 20 }),
+        expect.objectContaining({ label: "matched query tokens", value: 8, detail: "auto, login" }),
+        expect.objectContaining({ label: "exported", value: 8 }),
+      ]),
+    );
+    expect(result.content[0].text).toContain("score ");
+    expect(result.content[0].text).toContain("MiniSearch base");
+  });
+});
+
 describe("ignore rules", () => {
   it("respects .gitignore patterns via ignore", async () => {
     const { tools } = createFakePi();

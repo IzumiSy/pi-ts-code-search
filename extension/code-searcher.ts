@@ -32,6 +32,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       file: Type.Optional(Type.String({ description: "Optional file path filter." })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return.", minimum: 1, maximum: 50 })),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before searching." })),
+      explain: Type.Optional(Type.Boolean({ description: "Include score breakdown details for each hit." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const kind = normalizeKind(params.kind);
@@ -45,17 +46,19 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         kind,
         file: params.file,
         limit: normalizeLimit(params.limit, 10),
+        explain: Boolean(params.explain),
       });
 
       return {
-        content: [{ type: "text", text: formatSearchResults(params.query, hits) }],
+        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain)) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
           query: params.query,
           kind,
           file: params.file,
-          hits: hits.map(({ entry, score }) => ({ ...entry, score })),
+          explain: Boolean(params.explain),
+          hits: hits.map(({ entry, score, scoreBreakdown }) => ({ ...entry, score, scoreBreakdown })),
         },
       };
     },

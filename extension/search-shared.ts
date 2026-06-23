@@ -54,9 +54,16 @@ export interface SearchDocument {
   text: string;
 }
 
+export interface SearchScoreContribution {
+  label: string;
+  value: number;
+  detail?: string;
+}
+
 export interface SearchHit {
   entry: IndexEntry;
   score: number;
+  scoreBreakdown?: SearchScoreContribution[];
 }
 
 export interface ImportEdge {
