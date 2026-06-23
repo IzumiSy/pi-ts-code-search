@@ -55,24 +55,18 @@ Heuristics:
 
 ## Install
 
-Requirements:
-
-- Node.js
-- pnpm
-- pi
-
-Install dependencies:
+Install directly from GitHub:
 
 ```bash
-pnpm install
+pi install git:github.com/izumisy/pi-code-search
 ```
 
 ## Run
 
-Start pi with the extension enabled, while disabling globally installed extensions to avoid conflicts:
+Start pi normally after installation:
 
 ```bash
-pnpm dev
+pi
 ```
 
 
