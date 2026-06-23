@@ -58,7 +58,7 @@ Heuristics:
 Install directly from GitHub:
 
 ```bash
-pi install git:github.com/izumisy/pi-code-search
+pi install git:github.com/IzumiSy/pi-ts-code-search
 ```
 
 ## Run
