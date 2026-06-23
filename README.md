@@ -82,6 +82,44 @@ ts_code_search_search query="autoLogin" explain=true
 ts_code_search_search query="cache invalidation" refresh=true
 ```
 
+Identifier-like queries such as `autoLogin`, `AuthProvider`, or `foo_bar` are treated a bit more strictly than natural-language queries:
+
+- camelCase / PascalCase / separator-based names are tokenized before search
+- strict identifier-style search prefers matches that contain **all** identifier tokens
+- if strict matching finds nothing, search falls back to a broader query automatically
+
+This helps queries like `autoLogin` prefer `useAutoLogin` over noisy partial matches such as unrelated `Auto*` or `Autocomplete*` symbols.
+
+### Explain score breakdowns
+
+Use `explain=true` when you want to understand why a result ranked where it did:
+
+```text
+ts_code_search_search query="autoLogin" explain=true
+```
+
+When enabled, the tool includes per-hit score details in both:
+
+- text output
+- `details.hits[].scoreBreakdown`
+
+Typical score contributions include:
+
+- `MiniSearch base`
+- `exact identifier match`
+- `all query tokens in name/container`
+- `identifier suffix match`
+- `matched query tokens`
+- `exported`
+- `requested kind match`
+
+Example:
+
+```text
+1. useAutoLogin — src/auth.ts:2 [function, export] — function useAutoLogin
+   score 71.40 = MiniSearch base +5.40; all query tokens in name/container +30; identifier suffix match +20 (useAutoLogin); matched query tokens +8 (auto, login); exported +8
+```
+
 ### Outline one file
 
 ```text
