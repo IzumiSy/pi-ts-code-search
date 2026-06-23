@@ -7,7 +7,7 @@
   "type": "module",
   "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "dev": "pi --no-extension -e .",
+    "dev": "pi --no-extensions -e .",
     "test": "vitest run"
   },
   "keywords": [
