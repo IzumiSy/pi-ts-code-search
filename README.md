@@ -4,6 +4,8 @@ A **pi extension** for TypeScript/TSX-oriented code search.
 
 It uses `ts-morph` to extract symbols, `MiniSearch` to rank them in memory, and `ignore` for gitignore-style path filtering, so pi can find code by **symbol shape** instead of raw text alone.
 
+The goal is not "generic semantic search". The goal is to help an agent or developer get from a vague code question to the next concrete action: open this symbol, inspect this file, list these exports, follow these importers, check these references.
+
 ## What it adds
 
 This package registers these tools and bundles a `ts-code-search` skill:
