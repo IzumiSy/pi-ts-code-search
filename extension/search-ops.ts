@@ -425,9 +425,10 @@ export function formatSearchResults(
   hits: SearchHit[],
   explain = false,
   timing = false,
+  cacheHit = false,
   timings?: SearchStoreBuildTimings,
 ): string {
-  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = getTimingLine(timing, cacheHit, timings);
 
   if (hits.length === 0) {
     return appendTimingLine(`No TS/TSX symbol matches for "${query}".`, timingLine);
@@ -443,9 +444,10 @@ export function formatOutlineResults(
   file: string,
   entries: IndexEntry[],
   timing = false,
+  cacheHit = false,
   timings?: SearchStoreBuildTimings,
 ): string {
-  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = getTimingLine(timing, cacheHit, timings);
   if (entries.length === 0) {
     return appendTimingLine(`No indexed TS/TSX symbols found for ${file}.`, timingLine);
   }
@@ -461,13 +463,14 @@ export function formatExportResults(
   file: string | undefined,
   hits: SearchHit[],
   timing = false,
+  cacheHit = false,
   timings?: SearchStoreBuildTimings,
 ): string {
   const target = file ? ` in ${file}` : "";
   const header = query
     ? `${hits.length} exported TS/TSX symbols for "${query}"${target}:`
     : `${hits.length} exported TS/TSX symbols${target}:`;
-  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = getTimingLine(timing, cacheHit, timings);
 
   if (hits.length === 0) {
     return appendTimingLine(
@@ -486,11 +489,12 @@ export function formatImporterResults(
   symbol: string | undefined,
   hits: ImportEdge[],
   timing = false,
+  cacheHit = false,
   timings?: SearchStoreBuildTimings,
 ): string {
   const target = [symbol ? `symbol "${symbol}"` : undefined, file ? `file ${file}` : undefined].filter(Boolean).join(" in ");
   const header = `${hits.length} TS/TSX importers for ${target}:`;
-  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = getTimingLine(timing, cacheHit, timings);
 
   if (hits.length === 0) {
     return appendTimingLine(`No TS/TSX importers found for ${target}.`, timingLine);
@@ -504,10 +508,11 @@ export function formatReferenceResults(
   file: string | undefined,
   hits: ReferenceHit[],
   timing = false,
+  cacheHit = false,
   timings?: SearchStoreBuildTimings,
 ): string {
   const target = file ? `"${symbol}" in ${file}` : `"${symbol}"`;
-  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = getTimingLine(timing, cacheHit, timings);
   if (hits.length === 0) {
     return appendTimingLine(`No TS/TSX references found for ${target}.`, timingLine);
   }
@@ -545,7 +550,17 @@ function formatReferenceHit(hit: ReferenceHit, index: number): string {
 }
 
 function appendTimingLine(text: string, timingLine?: string): string {
-  return [text, timingLine].filter(Boolean).join("\n");
+  return timingLine ? `${text}\n\n${timingLine}` : text;
+}
+
+function getTimingLine(timing: boolean, cacheHit: boolean, timings?: SearchStoreBuildTimings): string | undefined {
+  if (!timing) {
+    return undefined;
+  }
+  if (cacheHit) {
+    return "timing cache hit — reused existing index";
+  }
+  return timings ? formatTimingLine(timings) : undefined;
 }
 
 function formatScoreBreakdown(scoreBreakdown: SearchScoreContribution[]): string {

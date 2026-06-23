@@ -137,13 +137,19 @@ ts_code_search_importers symbol="AuthProvider" timing=true
 ts_code_search_references symbol="getAccessToken" file="src/auth.ts" timing=true
 ```
 
-The timing line looks like this:
+The timing line looks like this on a rebuild:
 
 ```text
 timing total=967.26ms createProject=785.73ms collectIndexData=177.11ms entries=4.51ms importEdges=163.7ms addSearchDocuments=2.8ms
 ```
 
-The same data is also available in `details.timings`.
+When the cached index is reused instead of rebuilt, the tool prints:
+
+```text
+timing cache hit — reused existing index
+```
+
+The same build data is also available in `details.timings`, and cache reuse is reflected in `details.cacheHit`.
 
 ### Outline one file
 

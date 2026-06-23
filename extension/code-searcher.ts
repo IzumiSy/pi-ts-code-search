@@ -51,7 +51,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain), Boolean(params.timing), store.timings) }],
+        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain), Boolean(params.timing), cacheHit, store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -86,7 +86,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       const entries = outlineEntries(store, ctx.cwd, params.file);
 
       return {
-        content: [{ type: "text", text: formatOutlineResults(params.file, entries, Boolean(params.timing), store.timings) }],
+        content: [{ type: "text", text: formatOutlineResults(params.file, entries, Boolean(params.timing), cacheHit, store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -125,7 +125,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatExportResults(params.query, params.file, hits, Boolean(params.timing), store.timings) }],
+        content: [{ type: "text", text: formatExportResults(params.query, params.file, hits, Boolean(params.timing), cacheHit, store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -168,7 +168,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatImporterResults(params.file, params.symbol, hits, Boolean(params.timing), store.timings) }],
+        content: [{ type: "text", text: formatImporterResults(params.file, params.symbol, hits, Boolean(params.timing), cacheHit, store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -207,7 +207,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatReferenceResults(params.symbol, params.file, hits, Boolean(params.timing), store.timings) }],
+        content: [{ type: "text", text: formatReferenceResults(params.symbol, params.file, hits, Boolean(params.timing), cacheHit, store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,

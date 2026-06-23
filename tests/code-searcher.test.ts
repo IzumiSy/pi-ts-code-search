@@ -423,7 +423,7 @@ export function useAutoLogin() {
     );
     const searchDetails = getSearchDetails(searchResult);
     expect(searchDetails.timing).toBe(true);
-    expect(searchResult.content?.[0]?.text).toContain("timing total=");
+    expect(searchResult.content?.[0]?.text).toContain("\n\ntiming total=");
 
     const outlineResult = await outlineTool!.execute(
       "tool-call",
@@ -434,7 +434,7 @@ export function useAutoLogin() {
     );
     const outlineDetails = getOutlineDetails(outlineResult);
     expect(outlineDetails.timing).toBe(true);
-    expect(outlineResult.content?.[0]?.text).toContain("timing total=");
+    expect(outlineResult.content?.[0]?.text).toContain("\n\ntiming cache hit — reused existing index");
   });
 });
 
