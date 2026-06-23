@@ -2,7 +2,20 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ImportEdge,
+  IndexEntry,
+  ReferenceHit,
+  SearchScoreContribution,
+  SearchStoreBuildTimings,
+} from "../extension/search-shared.ts";
 import codeSearcher from "../extension/index.ts";
+
+type ToolResult = {
+  content?: Array<{ type: string; text: string }>;
+  details?: Record<string, unknown>;
+};
 
 type ToolDefinition = {
   name: string;
@@ -12,10 +25,21 @@ type ToolDefinition = {
     signal: AbortSignal | undefined,
     onUpdate: unknown,
     ctx: { cwd: string },
-  ) => Promise<{ details?: Record<string, unknown> }>;
+  ) => Promise<ToolResult>;
 };
 
-type EventHandler = (event: any, ctx: { cwd: string }) => Promise<unknown> | unknown;
+type EventHandler = (event: unknown, ctx: { cwd: string }) => Promise<unknown> | unknown;
+type SearchResultHit = IndexEntry & { score: number; scoreBreakdown?: SearchScoreContribution[] };
+type SearchDetails = {
+  builtAt?: number;
+  cacheHit?: boolean;
+  timings?: SearchStoreBuildTimings;
+  hits?: SearchResultHit[];
+  explain?: boolean;
+};
+type ImporterDetails = { hits?: ImportEdge[] };
+type OutlineDetails = { entries?: IndexEntry[] };
+type ReferenceDetails = { hits?: ReferenceHit[] };
 
 function createFakePi() {
   const tools = new Map<string, ToolDefinition>();
@@ -30,7 +54,7 @@ function createFakePi() {
     },
   };
 
-  codeSearcher(pi as never);
+  codeSearcher(pi as unknown as ExtensionAPI);
 
   return {
     tools,
@@ -56,11 +80,26 @@ function makeFilesProject(files: Record<string, string>) {
   return cwd;
 }
 
+function getSearchDetails(result: ToolResult): SearchDetails {
+  return (result.details ?? {}) as SearchDetails;
+}
+
+function getImporterDetails(result: ToolResult): ImporterDetails {
+  return (result.details ?? {}) as ImporterDetails;
+}
+
+function getOutlineDetails(result: ToolResult): OutlineDetails {
+  return (result.details ?? {}) as OutlineDetails;
+}
+
+function getReferenceDetails(result: ToolResult): ReferenceDetails {
+  return (result.details ?? {}) as ReferenceDetails;
+}
+
 async function hasMatch(searchTool: ToolDefinition, cwd: string, query: string) {
   const result = await searchTool.execute("tool-call", { query }, undefined, undefined, { cwd });
-  return typeof result.details?.builtAt === "number" && Array.isArray((result.details as any).hits)
-    ? (result.details as any).hits.length > 0
-    : false;
+  const details = getSearchDetails(result);
+  return typeof details.builtAt === "number" && (details.hits?.length ?? 0) > 0;
 }
 
 const createdDirs: string[] = [];
@@ -80,11 +119,13 @@ describe("code-searcher cache invalidation", () => {
 
     expect(searchTool).toBeDefined();
 
-    const firstResult: any = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
-    const secondResult: any = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
+    const firstResult = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
+    const secondResult = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
+    const firstDetails = getSearchDetails(firstResult);
+    const secondDetails = getSearchDetails(secondResult);
 
-    expect(firstResult.details.cacheHit).toBe(false);
-    expect(firstResult.details.timings).toEqual(
+    expect(firstDetails.cacheHit).toBe(false);
+    expect(firstDetails.timings).toEqual(
       expect.objectContaining({
         totalMs: expect.any(Number),
         createProjectMs: expect.any(Number),
@@ -94,8 +135,8 @@ describe("code-searcher cache invalidation", () => {
         addSearchDocumentsMs: expect.any(Number),
       }),
     );
-    expect(secondResult.details.cacheHit).toBe(true);
-    expect(secondResult.details.timings).toEqual(firstResult.details.timings);
+    expect(secondDetails.cacheHit).toBe(true);
+    expect(secondDetails.timings).toEqual(firstDetails.timings);
   });
 
   it.each(["write", "edit", "bash"])("rebuilds after %s tool execution", async (toolName) => {
@@ -166,10 +207,10 @@ describe("ts_code_search_importers", () => {
     const result = await importerTool!.execute("tool-call", { file: "src/foo.ts", symbol: "Foo" }, undefined, undefined, {
       cwd,
     });
-    const hits = (result.details as any).hits;
+    const hits = getImporterDetails(result).hits ?? [];
 
     expect(hits).toHaveLength(2);
-    expect(hits.map((hit: any) => [hit.importerFile, hit.importerKind])).toEqual([
+    expect(hits.map((hit) => [hit.importerFile, hit.importerKind])).toEqual([
       ["src/bar.ts", "import"],
       ["src/index.ts", "re-export"],
     ]);
@@ -215,14 +256,14 @@ export const authHelpers = {
       undefined,
       { cwd },
     );
-    const searchHits = (searchResult.details as any).hits;
-    expect(searchHits[0].qualifiedName).toBe("AuthService.login");
+    const searchHits = getSearchDetails(searchResult).hits ?? [];
+    expect(searchHits[0]?.qualifiedName).toBe("AuthService.login");
 
     const outlineResult = await outlineTool!.execute("tool-call", { file: "src/example.ts" }, undefined, undefined, {
       cwd,
     });
-    const entries = (outlineResult.details as any).entries;
-    expect(entries.map((entry: any) => entry.qualifiedName)).toEqual(
+    const entries = getOutlineDetails(outlineResult).entries ?? [];
+    expect(entries.map((entry) => entry.qualifiedName)).toEqual(
       expect.arrayContaining([
         "AuthService.login",
         "AuthService.token",
@@ -249,7 +290,7 @@ describe("ts_code_search_references", () => {
     const result = await referenceTool!.execute("tool-call", { symbol: "Foo", file: "src/foo.ts" }, undefined, undefined, {
       cwd,
     });
-    const hits = (result.details as any).hits;
+    const hits = getReferenceDetails(result).hits ?? [];
 
     expect(hits).toEqual(
       expect.arrayContaining([
@@ -291,9 +332,9 @@ export function AutocompleteRoot() {
     expect(searchTool).toBeDefined();
 
     const result = await searchTool!.execute("tool-call", { query: "autoLogin", limit: 10 }, undefined, undefined, { cwd });
-    const hits = (result.details as any).hits;
+    const hits = getSearchDetails(result).hits ?? [];
 
-    expect(hits.map((hit: any) => hit.qualifiedName)).toEqual(["useAutoLogin"]);
+    expect(hits.map((hit) => hit.qualifiedName)).toEqual(["useAutoLogin"]);
   });
 
   it("falls back to broader search when strict identifier matching finds nothing", async () => {
@@ -311,9 +352,9 @@ export function AutocompleteRoot() {
     expect(searchTool).toBeDefined();
 
     const result = await searchTool!.execute("tool-call", { query: "autoComplete", limit: 10 }, undefined, undefined, { cwd });
-    const hits = (result.details as any).hits;
+    const hits = getSearchDetails(result).hits ?? [];
 
-    expect(hits[0].qualifiedName).toBe("AutocompleteRoot");
+    expect(hits[0]?.qualifiedName).toBe("AutocompleteRoot");
   });
 
   it("returns score breakdowns when explain=true", async () => {
@@ -330,16 +371,17 @@ export function useAutoLogin() {
 
     expect(searchTool).toBeDefined();
 
-    const result: any = await searchTool!.execute(
+    const result = await searchTool!.execute(
       "tool-call",
       { query: "autoLogin", limit: 10, explain: true },
       undefined,
       undefined,
       { cwd },
     );
-    const [firstHit] = result.details.hits;
+    const details = getSearchDetails(result);
+    const [firstHit] = details.hits ?? [];
 
-    expect(result.details.explain).toBe(true);
+    expect(details.explain).toBe(true);
     expect(firstHit.scoreBreakdown).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "MiniSearch base" }),
@@ -349,8 +391,8 @@ export function useAutoLogin() {
         expect.objectContaining({ label: "exported", value: 8 }),
       ]),
     );
-    expect(result.content[0].text).toContain("score ");
-    expect(result.content[0].text).toContain("MiniSearch base");
+    expect(result.content?.[0]?.text).toContain("score ");
+    expect(result.content?.[0]?.text).toContain("MiniSearch base");
   });
 });
 

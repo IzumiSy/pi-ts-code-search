@@ -8,6 +8,11 @@ import {
   Project,
   SyntaxKind,
   VariableDeclarationKind,
+  type ExportDeclaration,
+  type ImportDeclaration,
+  type JSDoc,
+  type ObjectLiteralExpression,
+  type ParameterDeclaration,
   type SourceFile,
   type VariableDeclaration,
 } from "ts-morph";
@@ -25,6 +30,12 @@ import {
   type SearchStore,
   type SearchStoreAccess,
 } from "./search-shared.ts";
+
+type ImportLikeDeclaration = ImportDeclaration | ExportDeclaration;
+type ParameterizedNode = Node & { getParameters(): ParameterDeclaration[] };
+type JsDocNode = { getJsDocs?: () => JSDoc[] };
+type EntryNode = Node & { getNameNode?: () => Node | undefined };
+type ObjectMemberEntry = { node: Node; name: string; kind: "method" | "property"; propTokens: string[] };
 
 const storeByCwd = new Map<string, SearchStore>();
 
@@ -340,7 +351,7 @@ function collectEntries(project: Project, cwd: string, ignoreMatcher: ReturnType
           }),
         );
 
-        for (const member of collectObjectMembers(name, declaration)) {
+        for (const member of collectObjectMembers(declaration)) {
           entries.push(
             createEntry({
               cwd,
@@ -420,7 +431,12 @@ function collectImportEdges(project: Project, cwd: string, ignoreMatcher: Return
   );
 }
 
-function createImportEdge(cwd: string, source: SourceFile, declaration: any, importerKind: ImportEdge["importerKind"]) {
+function createImportEdge(
+  cwd: string,
+  source: SourceFile,
+  declaration: ImportLikeDeclaration,
+  importerKind: ImportEdge["importerKind"],
+) {
   const moduleSpecifier = declaration.getModuleSpecifierValue?.();
   if (!moduleSpecifier) {
     return undefined;
@@ -442,30 +458,40 @@ function createImportEdge(cwd: string, source: SourceFile, declaration: any, imp
   } satisfies ImportEdge;
 }
 
-function collectImportedSymbols(declaration: any): string[] {
+function collectImportedSymbols(declaration: ImportLikeDeclaration): string[] {
   const symbols: string[] = [];
-  const defaultImport = declaration.getDefaultImport?.();
-  if (defaultImport) {
-    symbols.push("default", defaultImport.getText());
-  }
 
-  const namespaceImport = declaration.getNamespaceImport?.();
-  if (namespaceImport) {
-    symbols.push("*", namespaceImport.getText());
-  }
-
-  for (const specifier of declaration.getNamedImports?.() ?? declaration.getNamedExports?.() ?? []) {
-    const name = specifier.getName?.();
-    if (name) {
-      symbols.push(name);
+  if (Node.isImportDeclaration(declaration)) {
+    const defaultImport = declaration.getDefaultImport();
+    if (defaultImport) {
+      symbols.push("default", defaultImport.getText());
     }
-    const alias = specifier.getAliasNode?.()?.getText?.();
+
+    const namespaceImport = declaration.getNamespaceImport();
+    if (namespaceImport) {
+      symbols.push("*", namespaceImport.getText());
+    }
+
+    for (const specifier of declaration.getNamedImports()) {
+      symbols.push(specifier.getName());
+      const alias = specifier.getAliasNode()?.getText();
+      if (alias) {
+        symbols.push(alias);
+      }
+    }
+
+    return dedupe(symbols);
+  }
+
+  for (const specifier of declaration.getNamedExports()) {
+    symbols.push(specifier.getName());
+    const alias = specifier.getAliasNode()?.getText();
     if (alias) {
       symbols.push(alias);
     }
   }
 
-  if (declaration.isNamespaceExport?.()) {
+  if (declaration.isNamespaceExport()) {
     symbols.push("*");
   }
 
@@ -483,7 +509,7 @@ function collectImportTokens(source: SourceFile): string[] {
   );
 }
 
-function classifyFunction(name: string, fn: Node): SearchKind {
+function classifyFunction(name: string, fn: ParameterizedNode): SearchKind {
   if (isHookName(name)) {
     return "hook";
   }
@@ -510,7 +536,7 @@ function classifyVariable(
   return declarationKind === VariableDeclarationKind.Const ? "const" : "variable";
 }
 
-function collectFunctionPropTokens(fn: any): string[] {
+function collectFunctionPropTokens(fn: ParameterizedNode): string[] {
   const firstParam = fn.getParameters?.()[0];
   if (!firstParam) {
     return [];
@@ -526,16 +552,13 @@ function collectVariablePropTokens(declaration: VariableDeclaration): string[] {
   return collectFunctionPropTokens(fn);
 }
 
-function collectObjectMembers(
-  name: string,
-  declaration: VariableDeclaration,
-): Array<{ node: Node; name: string; kind: "method" | "property"; propTokens: string[] }> {
+function collectObjectMembers(declaration: VariableDeclaration): ObjectMemberEntry[] {
   const objectLiteral = getVariableObjectLiteral(declaration);
   if (!objectLiteral) {
     return [];
   }
 
-  const members: Array<{ node: Node; name: string; kind: "method" | "property"; propTokens: string[] }> = [];
+  const members: ObjectMemberEntry[] = [];
 
   for (const member of objectLiteral.getProperties()) {
     if (Node.isMethodDeclaration(member)) {
@@ -567,7 +590,7 @@ function collectObjectMembers(
   return members;
 }
 
-function collectParameterTokens(param: any): string[] {
+function collectParameterTokens(param: ParameterDeclaration): string[] {
   const tokens: string[] = [];
   const nameNode = param.getNameNode?.();
   if (nameNode && Node.isObjectBindingPattern(nameNode)) {
@@ -590,7 +613,7 @@ function collectParameterTokens(param: any): string[] {
   return dedupe(tokens);
 }
 
-function getVariableFunctionLike(declaration: VariableDeclaration) {
+function getVariableFunctionLike(declaration: VariableDeclaration): ParameterizedNode | undefined {
   const initializer = declaration.getInitializer();
   if (!initializer) {
     return undefined;
@@ -601,7 +624,7 @@ function getVariableFunctionLike(declaration: VariableDeclaration) {
   return undefined;
 }
 
-function getVariableObjectLiteral(declaration: VariableDeclaration) {
+function getVariableObjectLiteral(declaration: VariableDeclaration): ObjectLiteralExpression | undefined {
   const initializer = declaration.getInitializer();
   if (!initializer || !Node.isObjectLiteralExpression(initializer)) {
     return undefined;
@@ -609,7 +632,7 @@ function getVariableObjectLiteral(declaration: VariableDeclaration) {
   return initializer;
 }
 
-function looksLikeComponent(name: string, node: Node): boolean {
+function looksLikeComponent(name: string, node: ParameterizedNode): boolean {
   if (!isPascalCase(name)) {
     return false;
   }
@@ -617,8 +640,7 @@ function looksLikeComponent(name: string, node: Node): boolean {
     return true;
   }
 
-  const parameters = (node as any).getParameters?.() ?? [];
-  return parameters.some((param: any) => {
+  return node.getParameters().some((param) => {
     const typeText = param.getTypeNode?.()?.getText?.() ?? "";
     return /Props\b/.test(typeText) || /props/i.test(param.getName?.() ?? "");
   });
@@ -640,9 +662,9 @@ function isPascalCase(name: string): boolean {
   return /^[A-Z][A-Za-z0-9]*$/.test(name);
 }
 
-function readJsDoc(node: any): { text: string; tokens: string[] } {
+function readJsDoc(node: JsDocNode): { text: string; tokens: string[] } {
   const text = (node.getJsDocs?.() ?? [])
-    .map((doc: any) => doc.getInnerText().trim())
+    .map((doc) => doc.getInnerText().trim())
     .filter(Boolean)
     .join("\n");
 
@@ -652,7 +674,7 @@ function readJsDoc(node: any): { text: string; tokens: string[] } {
 function createEntry(args: {
   cwd: string;
   source: SourceFile;
-  node: any;
+  node: EntryNode;
   name: string;
   kind: SearchKind;
   exported: boolean;
