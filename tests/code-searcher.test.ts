@@ -1,5 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import codeSearcher from "../extension/index.ts";
@@ -39,10 +39,20 @@ function createFakePi() {
 }
 
 function makeProject(functionName: string) {
+  return makeFilesProject({
+    "src/example.ts": `export function ${functionName}() { return "${functionName}"; }\n`,
+  });
+}
+
+function makeFilesProject(files: Record<string, string>) {
   const cwd = mkdtempSync(join(tmpdir(), "pi-ts-code-search-"));
-  const srcDir = join(cwd, "src");
-  mkdirSync(srcDir, { recursive: true });
-  writeFileSync(join(srcDir, "example.ts"), `export function ${functionName}() { return "${functionName}"; }\n`);
+
+  for (const [file, content] of Object.entries(files)) {
+    const fullPath = join(cwd, file);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+
   return cwd;
 }
 
@@ -111,5 +121,116 @@ describe("code-searcher cache invalidation", () => {
     await sessionShutdownHandlers[0]!({ reason: "quit" }, { cwd });
 
     expect(await hasMatch(searchTool!, cwd, "epsilon")).toBe(true);
+  });
+});
+
+describe("ts_index_importers", () => {
+  it("finds imports and re-exports for a file and symbol", async () => {
+    const { tools } = createFakePi();
+    const importerTool = tools.get("ts_index_importers");
+    const cwd = makeFilesProject({
+      "src/foo.ts": "export const Foo = 1;\n",
+      "src/bar.ts": 'import { Foo } from "./foo";\nexport const bar = Foo;\n',
+      "src/index.ts": 'export { Foo } from "./foo";\n',
+    });
+    createdDirs.push(cwd);
+
+    expect(importerTool).toBeDefined();
+
+    const result = await importerTool!.execute("tool-call", { file: "src/foo.ts", symbol: "Foo" }, undefined, undefined, {
+      cwd,
+    });
+    const hits = (result.details as any).hits;
+
+    expect(hits).toHaveLength(2);
+    expect(hits.map((hit: any) => [hit.importerFile, hit.importerKind])).toEqual([
+      ["src/bar.ts", "import"],
+      ["src/index.ts", "re-export"],
+    ]);
+  });
+});
+
+describe("member indexing", () => {
+  it("indexes class, enum, and object members", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_index_search");
+    const outlineTool = tools.get("ts_index_file_outline");
+    const cwd = makeFilesProject({
+      "src/example.ts": `
+export class AuthService {
+  token = "";
+
+  login(input: { userId: string }) {
+    return input.userId;
+  }
+}
+
+export enum Status {
+  Active = "active",
+}
+
+export const authHelpers = {
+  normalizeToken(value: string) {
+    return value.trim();
+  },
+  storageKey: "token",
+};
+`,
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+    expect(outlineTool).toBeDefined();
+
+    const searchResult = await searchTool!.execute(
+      "tool-call",
+      { query: "AuthService login", kind: "method" },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    const searchHits = (searchResult.details as any).hits;
+    expect(searchHits[0].qualifiedName).toBe("AuthService.login");
+
+    const outlineResult = await outlineTool!.execute("tool-call", { file: "src/example.ts" }, undefined, undefined, {
+      cwd,
+    });
+    const entries = (outlineResult.details as any).entries;
+    expect(entries.map((entry: any) => entry.qualifiedName)).toEqual(
+      expect.arrayContaining([
+        "AuthService.login",
+        "AuthService.token",
+        "Status.Active",
+        "authHelpers.normalizeToken",
+        "authHelpers.storageKey",
+      ]),
+    );
+  });
+});
+
+describe("ts_index_references", () => {
+  it("finds local and imported references for a top-level symbol", async () => {
+    const { tools } = createFakePi();
+    const referenceTool = tools.get("ts_index_references");
+    const cwd = makeFilesProject({
+      "src/foo.ts": 'export function Foo() { return 1; }\nexport function wrap() { return Foo(); }\n',
+      "src/bar.ts": 'import { Foo } from "./foo";\nexport const bar = Foo();\n',
+    });
+    createdDirs.push(cwd);
+
+    expect(referenceTool).toBeDefined();
+
+    const result = await referenceTool!.execute("tool-call", { symbol: "Foo", file: "src/foo.ts" }, undefined, undefined, {
+      cwd,
+    });
+    const hits = (result.details as any).hits;
+
+    expect(hits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ file: "src/foo.ts", kind: "call" }),
+        expect.objectContaining({ file: "src/bar.ts", kind: "import" }),
+        expect.objectContaining({ file: "src/bar.ts", kind: "call" }),
+      ]),
+    );
   });
 });

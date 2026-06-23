@@ -14,6 +14,10 @@ This extension registers these tools:
   - Return indexed symbols for a single file
 - `ts_index_exports`
   - Return exported symbols for one file or the whole project
+- `ts_index_importers`
+  - Find files that import or re-export a file or symbol
+- `ts_index_references`
+  - Find lightweight references for a top-level symbol
 
 ## Why it exists
 
@@ -29,7 +33,7 @@ This is for questions like:
 
 1. If `tsconfig.json` exists, build a `ts-morph` `Project` from it
 2. Otherwise, fall back to globbing `*.ts`, `*.tsx`, `*.js`, `*.jsx`
-3. Extract top-level declarations
+3. Extract top-level declarations plus common members (methods, properties, enum members)
 4. Build an in-memory `MiniSearch` index
 5. Apply a small post-ranking pass for code-aware relevance
 
@@ -50,10 +54,13 @@ Ignored by default:
 - interface
 - type
 - enum
+- enum-member
 - const
 - variable
 - component
 - hook
+- method
+- property
 
 Heuristics:
 
@@ -119,6 +126,21 @@ ts_index_exports file="src/auth.ts"
 ts_index_exports query="session"
 ```
 
+### Find importers
+
+```text
+ts_index_importers file="src/auth.ts"
+ts_index_importers symbol="AuthProvider"
+ts_index_importers file="src/auth.ts" symbol="AuthProvider"
+```
+
+### Find references
+
+```text
+ts_index_references symbol="getAccessToken" file="src/auth.ts"
+ts_index_references symbol="AuthProvider"
+```
+
 ## Ranking signals
 
 Results are mainly ranked by:
@@ -138,7 +160,8 @@ For example, `getAccessToken` is tokenized roughly as `get access token`.
 This is intentionally small.
 It does **not** try to do:
 
-- references / implementations lookup
+- full references / implementations lookup
+- rename / refactor-grade symbol resolution
 - rename / refactor actions
 - a background daemon
 - file watching
