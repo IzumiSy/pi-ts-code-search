@@ -40,7 +40,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         throw new Error(`Unsupported kind: ${params.kind}`);
       }
 
-      const store = getStore(ctx.cwd, Boolean(params.refresh));
+      const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = searchEntries(store, {
         query: params.query,
         kind,
@@ -54,6 +54,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
+          cacheHit,
+          timings: store.timings,
           query: params.query,
           kind,
           file: params.file,
@@ -77,7 +79,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before outlining." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const store = getStore(ctx.cwd, Boolean(params.refresh));
+      const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const entries = outlineEntries(store, ctx.cwd, params.file);
 
       return {
@@ -85,6 +87,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
+          cacheHit,
+          timings: store.timings,
           file: params.file,
           entries,
         },
@@ -107,7 +111,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before listing exports." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const store = getStore(ctx.cwd, Boolean(params.refresh));
+      const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const limit = normalizeLimit(params.limit, 50);
       const hits = exportEntries(store, ctx.cwd, {
         file: params.file,
@@ -120,6 +124,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
+          cacheHit,
+          timings: store.timings,
           query: params.query,
           file: params.file,
           hits: hits.map(({ entry, score }) => ({ ...entry, score })),
@@ -147,7 +153,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         throw new Error("Provide file or symbol.");
       }
 
-      const store = getStore(ctx.cwd, Boolean(params.refresh));
+      const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = importerEntries(store, ctx.cwd, {
         file: params.file,
         symbol: params.symbol,
@@ -159,6 +165,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
+          cacheHit,
+          timings: store.timings,
           file: params.file,
           symbol: params.symbol,
           hits,
@@ -182,7 +190,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before finding references." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const store = getStore(ctx.cwd, Boolean(params.refresh));
+      const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = referenceEntries(store, ctx.cwd, {
         symbol: params.symbol,
         file: params.file,
@@ -194,6 +202,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
+          cacheHit,
+          timings: store.timings,
           symbol: params.symbol,
           file: params.file,
           hits,

@@ -2,6 +2,7 @@ import ignore from "ignore";
 import MiniSearch from "minisearch";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import {
   Node,
   Project,
@@ -22,6 +23,7 @@ import {
   type SearchDocument,
   type SearchKind,
   type SearchStore,
+  type SearchStoreAccess,
 } from "./search-shared.ts";
 
 const storeByCwd = new Map<string, SearchStore>();
@@ -34,29 +36,46 @@ export function clearStores() {
   storeByCwd.clear();
 }
 
-export function getStore(cwd: string, refresh = false): SearchStore {
+export function getStore(cwd: string, refresh = false): SearchStoreAccess {
   const cached = storeByCwd.get(cwd);
   if (cached && !refresh) {
-    return cached;
+    return { store: cached, cacheHit: true };
   }
 
   const store = buildStore(cwd);
   storeByCwd.set(cwd, store);
-  return store;
+  return { store, cacheHit: false };
 }
 
 function buildStore(cwd: string): SearchStore {
+  const buildStartedAt = performance.now();
+
+  const createProjectStartedAt = performance.now();
   const project = createProject(cwd);
+  const createProjectMs = elapsedMs(createProjectStartedAt);
+
+  const createIgnoreMatcherStartedAt = performance.now();
   const ignoreMatcher = createIgnoreMatcher(cwd);
+  const createIgnoreMatcherMs = elapsedMs(createIgnoreMatcherStartedAt);
+
+  const collectEntriesStartedAt = performance.now();
   const entries = collectEntries(project, cwd, ignoreMatcher);
+  const collectEntriesMs = elapsedMs(collectEntriesStartedAt);
+
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+
+  const collectImportEdgesStartedAt = performance.now();
   const importEdges = collectImportEdges(project, cwd, ignoreMatcher);
+  const collectImportEdgesMs = elapsedMs(collectImportEdgesStartedAt);
+
   const search = new MiniSearch<SearchDocument>({
     fields: ["nameText", "pathText", "jsDocText", "propText", "importText", "text"],
     storeFields: ["id"],
   });
 
+  const addSearchDocumentsStartedAt = performance.now();
   search.addAll(entries.map(toSearchDocument));
+  const addSearchDocumentsMs = elapsedMs(addSearchDocumentsStartedAt);
 
   return {
     cwd,
@@ -66,7 +85,19 @@ function buildStore(cwd: string): SearchStore {
     entriesById,
     importEdges,
     search,
+    timings: {
+      totalMs: elapsedMs(buildStartedAt),
+      createProjectMs,
+      createIgnoreMatcherMs,
+      collectEntriesMs,
+      collectImportEdgesMs,
+      addSearchDocumentsMs,
+    },
   };
+}
+
+function elapsedMs(startedAt: number): number {
+  return Math.round((performance.now() - startedAt) * 100) / 100;
 }
 
 function createProject(cwd: string): Project {

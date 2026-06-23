@@ -88,6 +88,15 @@ export interface ReferenceHit {
   preview: string;
 }
 
+export interface SearchStoreBuildTimings {
+  totalMs: number;
+  createProjectMs: number;
+  createIgnoreMatcherMs: number;
+  collectEntriesMs: number;
+  collectImportEdgesMs: number;
+  addSearchDocumentsMs: number;
+}
+
 export interface SearchStore {
   cwd: string;
   builtAt: number;
@@ -96,6 +105,12 @@ export interface SearchStore {
   entriesById: Map<string, IndexEntry>;
   importEdges: ImportEdge[];
   search: MiniSearch<SearchDocument>;
+  timings: SearchStoreBuildTimings;
+}
+
+export interface SearchStoreAccess {
+  store: SearchStore;
+  cacheHit: boolean;
 }
 
 export function normalizeKind(kind?: string): SearchKind | undefined {

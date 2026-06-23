@@ -12,7 +12,7 @@ type ToolDefinition = {
     signal: AbortSignal | undefined,
     onUpdate: unknown,
     ctx: { cwd: string },
-  ) => Promise<{ details?: { builtAt?: number } }>;
+  ) => Promise<{ details?: Record<string, unknown> }>;
 };
 
 type EventHandler = (event: any, ctx: { cwd: string }) => Promise<unknown> | unknown;
@@ -72,6 +72,32 @@ afterEach(() => {
 });
 
 describe("code-searcher cache invalidation", () => {
+  it("returns build timings and cache state in tool details", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_code_search_search");
+    const cwd = makeProject("alpha");
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+
+    const firstResult: any = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
+    const secondResult: any = await searchTool!.execute("tool-call", { query: "alpha" }, undefined, undefined, { cwd });
+
+    expect(firstResult.details.cacheHit).toBe(false);
+    expect(firstResult.details.timings).toEqual(
+      expect.objectContaining({
+        totalMs: expect.any(Number),
+        createProjectMs: expect.any(Number),
+        createIgnoreMatcherMs: expect.any(Number),
+        collectEntriesMs: expect.any(Number),
+        collectImportEdgesMs: expect.any(Number),
+        addSearchDocumentsMs: expect.any(Number),
+      }),
+    );
+    expect(secondResult.details.cacheHit).toBe(true);
+    expect(secondResult.details.timings).toEqual(firstResult.details.timings);
+  });
+
   it.each(["write", "edit", "bash"])("rebuilds after %s tool execution", async (toolName) => {
     const { tools, handlers } = createFakePi();
     const searchTool = tools.get("ts_code_search_search");
