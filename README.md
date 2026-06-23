@@ -2,7 +2,7 @@
 
 A **pi extension** for TypeScript/TSX-oriented code search.
 
-It uses `ts-morph` to extract symbols and `MiniSearch` to index them in memory, so pi can find code by **symbol shape** instead of raw text alone.
+It uses `ts-morph` to extract symbols, `MiniSearch` to rank them in memory, and `ignore` for gitignore-style path filtering, so pi can find code by **symbol shape** instead of raw text alone.
 
 ## What it adds
 
@@ -46,6 +46,8 @@ Ignored by default:
 - `.next`
 - `.turbo`
 - `*.d.ts`
+
+Plus patterns from the repo `.gitignore`, using gitignore semantics via `ignore`.
 
 ## Indexed symbol kinds
 
@@ -180,6 +182,7 @@ Dependencies:
 
 - `ts-morph`
 - `minisearch`
+- `ignore`
 - `typescript`
 
 Peer dependencies:

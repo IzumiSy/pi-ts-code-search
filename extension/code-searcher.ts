@@ -1,7 +1,8 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import ignore from "ignore";
 import MiniSearch from "minisearch";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   Node,
@@ -28,14 +29,7 @@ const SEARCH_KINDS = [
   "export",
 ] as const;
 const SEARCH_KIND_SET = new Set<string>(SEARCH_KINDS);
-const IGNORED_PATH_PARTS = new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  ".next",
-  ".turbo",
-]);
+const DEFAULT_IGNORE_RULES = ["node_modules/", "dist/", "build/", "coverage/", ".next/", ".turbo/", "*.d.ts"];
 
 type SearchKind = (typeof SEARCH_KINDS)[number];
 
@@ -321,9 +315,10 @@ function getStore(cwd: string, refresh = false): SearchStore {
 
 function buildStore(cwd: string): SearchStore {
   const project = createProject(cwd);
-  const entries = collectEntries(project, cwd);
+  const ignoreMatcher = createIgnoreMatcher(cwd);
+  const entries = collectEntries(project, cwd, ignoreMatcher);
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
-  const importEdges = collectImportEdges(project, cwd);
+  const importEdges = collectImportEdges(project, cwd, ignoreMatcher);
   const search = new MiniSearch<SearchDocument>({
     fields: ["nameText", "pathText", "jsDocText", "propText", "importText", "text"],
     storeFields: ["id"],
@@ -369,11 +364,20 @@ function createProject(cwd: string): Project {
   return project;
 }
 
-function collectEntries(project: Project, cwd: string): IndexEntry[] {
+function createIgnoreMatcher(cwd: string) {
+  const matcher = ignore().add(DEFAULT_IGNORE_RULES);
+  const gitignorePath = path.join(cwd, ".gitignore");
+  if (existsSync(gitignorePath)) {
+    matcher.add(readFileSync(gitignorePath, "utf8"));
+  }
+  return matcher;
+}
+
+function collectEntries(project: Project, cwd: string, ignoreMatcher: ReturnType<typeof ignore>): IndexEntry[] {
   const entries: IndexEntry[] = [];
 
   for (const source of project.getSourceFiles()) {
-    if (!shouldIndexSourceFile(cwd, source)) {
+    if (!shouldIndexSourceFile(cwd, source, ignoreMatcher)) {
       continue;
     }
 
@@ -606,7 +610,7 @@ function collectEntries(project: Project, cwd: string): IndexEntry[] {
   });
 }
 
-function shouldIndexSourceFile(cwd: string, source: SourceFile): boolean {
+function shouldIndexSourceFile(cwd: string, source: SourceFile, ignoreMatcher: ReturnType<typeof ignore>): boolean {
   const absFile = source.getFilePath();
   if (absFile.endsWith(".d.ts")) {
     return false;
@@ -619,14 +623,14 @@ function shouldIndexSourceFile(cwd: string, source: SourceFile): boolean {
   if (!/\.(ts|tsx|js|jsx)$/i.test(relative)) {
     return false;
   }
-  return !relative.split("/").some((part) => IGNORED_PATH_PARTS.has(part));
+  return !ignoreMatcher.ignores(relative);
 }
 
-function collectImportEdges(project: Project, cwd: string): ImportEdge[] {
+function collectImportEdges(project: Project, cwd: string, ignoreMatcher: ReturnType<typeof ignore>): ImportEdge[] {
   const edges: ImportEdge[] = [];
 
   for (const source of project.getSourceFiles()) {
-    if (!shouldIndexSourceFile(cwd, source)) {
+    if (!shouldIndexSourceFile(cwd, source, ignoreMatcher)) {
       continue;
     }
 
@@ -1057,6 +1061,7 @@ function referenceEntries(
   options: { symbol: string; file?: string; limit: number },
 ): ReferenceHit[] {
   const hits = new Map<string, ReferenceHit>();
+  const ignoreMatcher = createIgnoreMatcher(cwd);
 
   for (const entry of findReferenceTargets(store, cwd, options.symbol, options.file)) {
     const referenceNode = findReferenceNode(store.project, entry);
@@ -1070,7 +1075,7 @@ function referenceEntries(
       }
 
       const source = node.getSourceFile();
-      if (!shouldIndexSourceFile(cwd, source)) {
+      if (!shouldIndexSourceFile(cwd, source, ignoreMatcher)) {
         continue;
       }
 

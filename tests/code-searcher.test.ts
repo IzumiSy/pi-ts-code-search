@@ -234,3 +234,20 @@ describe("ts_index_references", () => {
     );
   });
 });
+
+describe("ignore rules", () => {
+  it("respects .gitignore patterns via ignore", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_index_search");
+    const cwd = makeFilesProject({
+      ".gitignore": "generated/\n",
+      "src/visible.ts": 'export function visible() { return true; }\n',
+      "generated/hidden.ts": 'export function hidden() { return false; }\n',
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+    expect(await hasMatch(searchTool!, cwd, "visible")).toBe(true);
+    expect(await hasMatch(searchTool!, cwd, "hidden")).toBe(false);
+  });
+});
