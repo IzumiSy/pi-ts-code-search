@@ -32,29 +32,32 @@ export function searchEntries(
   const results = strictIdentifierSearch && primaryResults.length === 0
     ? store.search.search(normalizedQuery, getSearchOptions(false))
     : primaryResults;
+  const hits: SearchHit[] = [];
 
-  return results
-    .map((result) => {
-      const entry = store.entriesById.get(String(result.id));
-      if (!entry) {
-        return undefined;
-      }
-      if (options.kind && entry.kind !== options.kind) {
-        return undefined;
-      }
-      if (options.file && !matchesFile(entry, store.cwd, options.file)) {
-        return undefined;
-      }
+  for (const result of results) {
+    const entry = store.entriesById.get(String(result.id));
+    if (!entry) {
+      continue;
+    }
+    if (options.kind && entry.kind !== options.kind) {
+      continue;
+    }
+    if (options.file && !matchesFile(entry, store.cwd, options.file)) {
+      continue;
+    }
 
-      const ranked = rankEntry(entry, result.score, options.query, queryTokens, options.kind, Boolean(options.explain));
+    const ranked = rankEntry(entry, result.score, options.query, queryTokens, options.kind, Boolean(options.explain));
+    const hit: SearchHit = {
+      entry,
+      score: ranked.score,
+    };
+    if (ranked.scoreBreakdown) {
+      hit.scoreBreakdown = ranked.scoreBreakdown;
+    }
+    hits.push(hit);
+  }
 
-      return {
-        entry,
-        score: ranked.score,
-        scoreBreakdown: ranked.scoreBreakdown,
-      };
-    })
-    .filter((hit): hit is SearchHit => Boolean(hit))
+  return hits
     .sort((a, b) => b.score - a.score || a.entry.file.localeCompare(b.entry.file) || a.entry.line - b.entry.line)
     .slice(0, options.limit);
 }
@@ -444,7 +447,7 @@ export function formatExportResults(query: string | undefined, file: string | un
       : `No exported TS/TSX symbols found${target}.`;
   }
 
-  return [header, ...hits.map(formatHit)].join("\n");
+  return [header, ...hits.map((hit, index) => formatHit(hit, index))].join("\n");
 }
 
 export function formatImporterResults(file: string | undefined, symbol: string | undefined, hits: ImportEdge[]): string {

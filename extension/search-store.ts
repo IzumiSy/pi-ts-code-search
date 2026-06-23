@@ -526,48 +526,45 @@ function collectVariablePropTokens(declaration: VariableDeclaration): string[] {
   return collectFunctionPropTokens(fn);
 }
 
-function collectObjectMembers(name: string, declaration: VariableDeclaration) {
+function collectObjectMembers(
+  name: string,
+  declaration: VariableDeclaration,
+): Array<{ node: Node; name: string; kind: "method" | "property"; propTokens: string[] }> {
   const objectLiteral = getVariableObjectLiteral(declaration);
   if (!objectLiteral) {
     return [];
   }
 
-  return objectLiteral.getProperties().flatMap((member: any) => {
-    if (!member.getName) {
-      return [];
-    }
+  const members: Array<{ node: Node; name: string; kind: "method" | "property"; propTokens: string[] }> = [];
 
-    const memberName = member.getName();
-    if (!memberName) {
-      return [];
-    }
-
+  for (const member of objectLiteral.getProperties()) {
     if (Node.isMethodDeclaration(member)) {
-      return [{ node: member, name: memberName, kind: "method" as const, propTokens: collectFunctionPropTokens(member) }];
+      members.push({ node: member, name: member.getName(), kind: "method", propTokens: collectFunctionPropTokens(member) });
+      continue;
     }
 
     if (Node.isPropertyAssignment(member)) {
+      const memberName = member.getName();
       const initializer = member.getInitializer();
       if (initializer && (Node.isArrowFunction(initializer) || Node.isFunctionExpression(initializer))) {
-        return [
-          {
-            node: member,
-            name: memberName,
-            kind: "method" as const,
-            propTokens: collectFunctionPropTokens(initializer),
-          },
-        ];
+        members.push({
+          node: member,
+          name: memberName,
+          kind: "method",
+          propTokens: collectFunctionPropTokens(initializer),
+        });
+      } else {
+        members.push({ node: member, name: memberName, kind: "property", propTokens: [] });
       }
-
-      return [{ node: member, name: memberName, kind: "property" as const, propTokens: [] }];
+      continue;
     }
 
     if (Node.isShorthandPropertyAssignment(member)) {
-      return [{ node: member, name: memberName, kind: "property" as const, propTokens: [] }];
+      members.push({ node: member, name: member.getName(), kind: "property", propTokens: [] });
     }
+  }
 
-    return [];
-  });
+  return members;
 }
 
 function collectParameterTokens(param: any): string[] {

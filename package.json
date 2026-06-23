@@ -8,7 +8,8 @@
   "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "pi --no-extensions -e .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc"
   },
   "keywords": [
     "pi-package",
@@ -43,6 +44,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
+    "@types/node": "^24.10.0",
     "vitest": "^4.1.9"
   }
 }
