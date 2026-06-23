@@ -33,6 +33,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return.", minimum: 1, maximum: 50 })),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before searching." })),
       explain: Type.Optional(Type.Boolean({ description: "Include score breakdown details for each hit." })),
+      timing: Type.Optional(Type.Boolean({ description: "Append index build timing details to the text output." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const kind = normalizeKind(params.kind);
@@ -50,7 +51,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain), store.timings) }],
+        content: [{ type: "text", text: formatSearchResults(params.query, hits, Boolean(params.explain), Boolean(params.timing), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -60,6 +61,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
           kind,
           file: params.file,
           explain: Boolean(params.explain),
+          timing: Boolean(params.timing),
           hits: hits.map(({ entry, score, scoreBreakdown }) => ({ ...entry, score, scoreBreakdown })),
         },
       };
@@ -77,19 +79,21 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
     parameters: Type.Object({
       file: Type.String({ description: "File path to outline." }),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before outlining." })),
+      timing: Type.Optional(Type.Boolean({ description: "Append index build timing details to the text output." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const entries = outlineEntries(store, ctx.cwd, params.file);
 
       return {
-        content: [{ type: "text", text: formatOutlineResults(params.file, entries) }],
+        content: [{ type: "text", text: formatOutlineResults(params.file, entries, Boolean(params.timing), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
           cacheHit,
           timings: store.timings,
           file: params.file,
+          timing: Boolean(params.timing),
           entries,
         },
       };
@@ -109,6 +113,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       query: Type.Optional(Type.String({ description: "Optional search query to rank exports." })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return.", minimum: 1, maximum: 100 })),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before listing exports." })),
+      timing: Type.Optional(Type.Boolean({ description: "Append index build timing details to the text output." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
@@ -120,7 +125,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatExportResults(params.query, params.file, hits) }],
+        content: [{ type: "text", text: formatExportResults(params.query, params.file, hits, Boolean(params.timing), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -128,6 +133,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
           timings: store.timings,
           query: params.query,
           file: params.file,
+          timing: Boolean(params.timing),
           hits: hits.map(({ entry, score }) => ({ ...entry, score })),
         },
       };
@@ -147,6 +153,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       symbol: Type.Optional(Type.String({ description: "Optional imported symbol name filter." })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return.", minimum: 1, maximum: 100 })),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before listing importers." })),
+      timing: Type.Optional(Type.Boolean({ description: "Append index build timing details to the text output." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!params.file && !params.symbol) {
@@ -161,7 +168,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatImporterResults(params.file, params.symbol, hits) }],
+        content: [{ type: "text", text: formatImporterResults(params.file, params.symbol, hits, Boolean(params.timing), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -169,6 +176,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
           timings: store.timings,
           file: params.file,
           symbol: params.symbol,
+          timing: Boolean(params.timing),
           hits,
         },
       };
@@ -188,6 +196,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       file: Type.Optional(Type.String({ description: "Optional declaring file path filter." })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of matches to return.", minimum: 1, maximum: 100 })),
       refresh: Type.Optional(Type.Boolean({ description: "Rebuild the index before finding references." })),
+      timing: Type.Optional(Type.Boolean({ description: "Append index build timing details to the text output." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
@@ -198,7 +207,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       });
 
       return {
-        content: [{ type: "text", text: formatReferenceResults(params.symbol, params.file, hits) }],
+        content: [{ type: "text", text: formatReferenceResults(params.symbol, params.file, hits, Boolean(params.timing), store.timings) }],
         details: {
           cwd: ctx.cwd,
           builtAt: store.builtAt,
@@ -206,6 +215,7 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
           timings: store.timings,
           symbol: params.symbol,
           file: params.file,
+          timing: Boolean(params.timing),
           hits,
         },
       };

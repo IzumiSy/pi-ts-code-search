@@ -79,6 +79,7 @@ ts_code_search_search query="auth token"
 ts_code_search_search query="session manager" kind="class"
 ts_code_search_search query="login" limit=10
 ts_code_search_search query="autoLogin" explain=true
+ts_code_search_search query="autoLogin" explain=true timing=true
 ts_code_search_search query="cache invalidation" refresh=true
 ```
 
@@ -119,6 +120,30 @@ Example:
 1. useAutoLogin — src/auth.ts:2 [function, export] — function useAutoLogin
    score 71.40 = MiniSearch base +5.40; all query tokens in name/container +30; identifier suffix match +20 (useAutoLogin); matched query tokens +8 (auto, login); exported +8
 ```
+
+`explain=true` only affects score explanations. It does **not** print timing information by itself.
+
+### Show timing information
+
+Use `timing=true` to append one timing line to the end of the text output.
+This works for all `ts_code_search_*` tools.
+
+```text
+ts_code_search_search query="autoLogin" timing=true
+ts_code_search_search query="autoLogin" explain=true timing=true
+ts_code_search_file_outline file="src/auth.ts" timing=true
+ts_code_search_exports query="session" timing=true
+ts_code_search_importers symbol="AuthProvider" timing=true
+ts_code_search_references symbol="getAccessToken" file="src/auth.ts" timing=true
+```
+
+The timing line looks like this:
+
+```text
+timing total=967.26ms createProject=785.73ms collectIndexData=177.11ms entries=4.51ms importEdges=163.7ms addSearchDocuments=2.8ms
+```
+
+The same data is also available in `details.timings`.
 
 ### Outline one file
 

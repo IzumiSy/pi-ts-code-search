@@ -424,65 +424,95 @@ export function formatSearchResults(
   query: string,
   hits: SearchHit[],
   explain = false,
+  timing = false,
   timings?: SearchStoreBuildTimings,
 ): string {
-  const timingLine = explain && timings ? formatTimingLine(timings) : undefined;
+  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
 
   if (hits.length === 0) {
-    return [
-      `No TS/TSX symbol matches for "${query}".`,
-      timingLine,
-    ].filter(Boolean).join("\n");
+    return appendTimingLine(`No TS/TSX symbol matches for "${query}".`, timingLine);
   }
 
-  return [
-    `${hits.length} TS/TSX symbol matches for "${query}":`,
-    ...hits.map((hit, index) => formatHit(hit, index, explain)),
+  return appendTimingLine(
+    [`${hits.length} TS/TSX symbol matches for "${query}":`, ...hits.map((hit, index) => formatHit(hit, index, explain))].join("\n"),
     timingLine,
-  ].filter(Boolean).join("\n");
+  );
 }
 
-export function formatOutlineResults(file: string, entries: IndexEntry[]): string {
+export function formatOutlineResults(
+  file: string,
+  entries: IndexEntry[],
+  timing = false,
+  timings?: SearchStoreBuildTimings,
+): string {
+  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
   if (entries.length === 0) {
-    return `No indexed TS/TSX symbols found for ${file}.`;
+    return appendTimingLine(`No indexed TS/TSX symbols found for ${file}.`, timingLine);
   }
 
-  return [`${entries.length} indexed symbols in ${file}:`, ...entries.map((entry) => formatEntryLine(entry))].join("\n");
+  return appendTimingLine(
+    [`${entries.length} indexed symbols in ${file}:`, ...entries.map((entry) => formatEntryLine(entry))].join("\n"),
+    timingLine,
+  );
 }
 
-export function formatExportResults(query: string | undefined, file: string | undefined, hits: SearchHit[]): string {
+export function formatExportResults(
+  query: string | undefined,
+  file: string | undefined,
+  hits: SearchHit[],
+  timing = false,
+  timings?: SearchStoreBuildTimings,
+): string {
   const target = file ? ` in ${file}` : "";
   const header = query
     ? `${hits.length} exported TS/TSX symbols for "${query}"${target}:`
     : `${hits.length} exported TS/TSX symbols${target}:`;
+  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
 
   if (hits.length === 0) {
-    return query
-      ? `No exported TS/TSX symbols matched "${query}"${target}.`
-      : `No exported TS/TSX symbols found${target}.`;
+    return appendTimingLine(
+      query
+        ? `No exported TS/TSX symbols matched "${query}"${target}.`
+        : `No exported TS/TSX symbols found${target}.`,
+      timingLine,
+    );
   }
 
-  return [header, ...hits.map((hit, index) => formatHit(hit, index))].join("\n");
+  return appendTimingLine([header, ...hits.map((hit, index) => formatHit(hit, index))].join("\n"), timingLine);
 }
 
-export function formatImporterResults(file: string | undefined, symbol: string | undefined, hits: ImportEdge[]): string {
+export function formatImporterResults(
+  file: string | undefined,
+  symbol: string | undefined,
+  hits: ImportEdge[],
+  timing = false,
+  timings?: SearchStoreBuildTimings,
+): string {
   const target = [symbol ? `symbol "${symbol}"` : undefined, file ? `file ${file}` : undefined].filter(Boolean).join(" in ");
   const header = `${hits.length} TS/TSX importers for ${target}:`;
+  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
 
   if (hits.length === 0) {
-    return `No TS/TSX importers found for ${target}.`;
+    return appendTimingLine(`No TS/TSX importers found for ${target}.`, timingLine);
   }
 
-  return [header, ...hits.map(formatImportEdge)].join("\n");
+  return appendTimingLine([header, ...hits.map(formatImportEdge)].join("\n"), timingLine);
 }
 
-export function formatReferenceResults(symbol: string, file: string | undefined, hits: ReferenceHit[]): string {
+export function formatReferenceResults(
+  symbol: string,
+  file: string | undefined,
+  hits: ReferenceHit[],
+  timing = false,
+  timings?: SearchStoreBuildTimings,
+): string {
   const target = file ? `"${symbol}" in ${file}` : `"${symbol}"`;
+  const timingLine = timing && timings ? formatTimingLine(timings) : undefined;
   if (hits.length === 0) {
-    return `No TS/TSX references found for ${target}.`;
+    return appendTimingLine(`No TS/TSX references found for ${target}.`, timingLine);
   }
 
-  return [`${hits.length} TS/TSX references for ${target}:`, ...hits.map(formatReferenceHit)].join("\n");
+  return appendTimingLine([`${hits.length} TS/TSX references for ${target}:`, ...hits.map(formatReferenceHit)].join("\n"), timingLine);
 }
 
 function formatHit(hit: SearchHit, index: number, explain = false): string {
@@ -512,6 +542,10 @@ function formatImportEdge(edge: ImportEdge, index: number): string {
 
 function formatReferenceHit(hit: ReferenceHit, index: number): string {
   return `${index + 1}. ${hit.file}:${hit.line} [${hit.kind}] <- ${hit.declarationName} @ ${hit.declarationFile} — ${hit.preview}`;
+}
+
+function appendTimingLine(text: string, timingLine?: string): string {
+  return [text, timingLine].filter(Boolean).join("\n");
 }
 
 function formatScoreBreakdown(scoreBreakdown: SearchScoreContribution[]): string {

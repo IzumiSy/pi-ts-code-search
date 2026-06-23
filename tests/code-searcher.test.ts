@@ -36,9 +36,10 @@ type SearchDetails = {
   timings?: SearchStoreBuildTimings;
   hits?: SearchResultHit[];
   explain?: boolean;
+  timing?: boolean;
 };
 type ImporterDetails = { hits?: ImportEdge[] };
-type OutlineDetails = { entries?: IndexEntry[] };
+type OutlineDetails = { entries?: IndexEntry[]; timing?: boolean };
 type ReferenceDetails = { hits?: ReferenceHit[] };
 
 function createFakePi() {
@@ -394,7 +395,46 @@ export function useAutoLogin() {
     );
     expect(result.content?.[0]?.text).toContain("score ");
     expect(result.content?.[0]?.text).toContain("MiniSearch base");
-    expect(result.content?.[0]?.text).toContain("timing total=");
+    expect(result.content?.[0]?.text).not.toContain("timing total=");
+  });
+
+  it("appends a timing line when timing=true", async () => {
+    const { tools } = createFakePi();
+    const searchTool = tools.get("ts_code_search_search");
+    const outlineTool = tools.get("ts_code_search_file_outline");
+    const cwd = makeFilesProject({
+      "src/auth.ts": `
+export function useAutoLogin() {
+  return true;
+}
+`,
+    });
+    createdDirs.push(cwd);
+
+    expect(searchTool).toBeDefined();
+    expect(outlineTool).toBeDefined();
+
+    const searchResult = await searchTool!.execute(
+      "tool-call",
+      { query: "autoLogin", limit: 10, explain: true, timing: true },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    const searchDetails = getSearchDetails(searchResult);
+    expect(searchDetails.timing).toBe(true);
+    expect(searchResult.content?.[0]?.text).toContain("timing total=");
+
+    const outlineResult = await outlineTool!.execute(
+      "tool-call",
+      { file: "src/auth.ts", timing: true },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    const outlineDetails = getOutlineDetails(outlineResult);
+    expect(outlineDetails.timing).toBe(true);
+    expect(outlineResult.content?.[0]?.text).toContain("timing total=");
   });
 });
 
