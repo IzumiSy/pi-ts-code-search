@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import codeSearcher from "../extensions/code-searcher/index.ts";
+import codeSearcher from "../extension/index.ts";
 
 type ToolDefinition = {
   name: string;

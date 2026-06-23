@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "description": "pi extension for TypeScript/TSX symbol search with ts-morph and MiniSearch",
   "license": "MIT",
+  "author": "izumisy",
   "type": "module",
   "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "dev": "pi -e ./extensions/code-searcher/index.ts",
+    "dev": "pi -e .",
     "test": "vitest run"
   },
   "keywords": [
@@ -15,9 +16,16 @@
     "typescript",
     "search"
   ],
+  "files": [
+    "extension",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "pi": {
     "extensions": [
-      "./extensions/code-searcher"
+      "./extension/index.ts"
     ]
   },
   "dependencies": {

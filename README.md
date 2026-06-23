@@ -82,13 +82,13 @@ Start pi with the extension enabled:
 pnpm dev
 ```
 
-The extension is wired through `package.json`:
+The package is wired through `package.json`:
 
 ```json
 {
   "pi": {
     "extensions": [
-      "./extensions/code-searcher"
+      "./extension/index.ts"
     ]
   }
 }
@@ -151,7 +151,7 @@ The index is cached **per cwd in memory**. Use `refresh=true` when you want a re
 
 Current implementation lives mostly in:
 
-- `extensions/code-searcher/index.ts`
+- `extension/index.ts`
 
 Dependencies:
 
