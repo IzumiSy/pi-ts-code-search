@@ -44,10 +44,10 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = searchEntries(store, {
         query: params.query,
-        kind,
-        file: params.file,
         limit: normalizeLimit(params.limit, 10),
         explain: Boolean(params.explain),
+        ...(kind ? { kind } : {}),
+        ...(params.file ? { file: params.file } : {}),
       });
 
       return {
@@ -119,9 +119,9 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const limit = normalizeLimit(params.limit, 50);
       const hits = exportEntries(store, ctx.cwd, {
-        file: params.file,
-        query: params.query,
         limit,
+        ...(params.file ? { file: params.file } : {}),
+        ...(params.query ? { query: params.query } : {}),
       });
 
       return {
@@ -162,9 +162,9 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
 
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = importerEntries(store, ctx.cwd, {
-        file: params.file,
-        symbol: params.symbol,
         limit: normalizeLimit(params.limit, 50),
+        ...(params.file ? { file: params.file } : {}),
+        ...(params.symbol ? { symbol: params.symbol } : {}),
       });
 
       return {
@@ -202,8 +202,8 @@ export default function registerCodeSearcher(pi: ExtensionAPI) {
       const { store, cacheHit } = getStore(ctx.cwd, Boolean(params.refresh));
       const hits = referenceEntries(store, ctx.cwd, {
         symbol: params.symbol,
-        file: params.file,
         limit: normalizeLimit(params.limit, 50),
+        ...(params.file ? { file: params.file } : {}),
       });
 
       return {

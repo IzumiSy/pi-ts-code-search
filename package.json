@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "pi --no-extensions -e .",
     "test": "vitest run",
-    "type-check": "tsc"
+    "type-check": "tsc -b --noEmit"
   },
   "keywords": [
     "pi-package",

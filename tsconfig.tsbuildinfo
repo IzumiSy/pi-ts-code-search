@@ -1,0 +1,1 @@
+{"root":["./extension/code-searcher.ts","./extension/index.ts","./extension/search-ops.ts","./extension/search-shared.ts","./extension/search-store.ts","./tests/code-searcher.test.ts"],"errors":true,"version":"6.0.3"}

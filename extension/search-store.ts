@@ -471,13 +471,15 @@ function createImportEdge(
   const importedSource = declaration.getModuleSpecifierSourceFile?.();
   const importedFile = importedSource ? relativeFile(cwd, importedSource.getFilePath()) : undefined;
 
+  const normalizedImportedFile = importedFile?.startsWith("../") ? undefined : importedFile;
+
   return {
     importerFile: relativeFile(cwd, source.getFilePath()),
     importerLine: pos.line,
     importerColumn: pos.column,
     importerKind,
     moduleSpecifier,
-    importedFile: importedFile?.startsWith("../") ? undefined : importedFile,
+    ...(normalizedImportedFile ? { importedFile: normalizedImportedFile } : {}),
     importedSymbols: collectImportedSymbols(declaration),
     preview: firstLine(declaration.getText()),
   } satisfies ImportEdge;
@@ -744,7 +746,7 @@ function createEntry(args: {
     kind: args.kind,
     exported: args.exported,
     defaultExport: args.defaultExport,
-    container: args.container,
+    ...(args.container ? { container: args.container } : {}),
     containerTokens,
     pathTokens,
     nameTokens,

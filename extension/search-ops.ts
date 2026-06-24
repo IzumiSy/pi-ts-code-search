@@ -69,9 +69,11 @@ export function exportEntries(
   options: { file?: string; query?: string; limit: number },
 ): SearchHit[] {
   if (options.query) {
-    return searchEntries(store, { query: options.query, file: options.file, limit: options.limit }).filter(
-      ({ entry }) => entry.exported,
-    );
+    return searchEntries(store, {
+      query: options.query,
+      limit: options.limit,
+      ...(options.file ? { file: options.file } : {}),
+    }).filter(({ entry }) => entry.exported);
   }
 
   return store.entries
@@ -313,7 +315,7 @@ function rankEntry(
     score += addScore(scoreBreakdown, '"hook" query bonus', 8);
   }
 
-  return { score, scoreBreakdown };
+  return scoreBreakdown ? { score, scoreBreakdown } : { score };
 }
 
 function addScore(
@@ -323,7 +325,7 @@ function addScore(
   detail?: string,
 ): number {
   if (scoreBreakdown && value !== 0) {
-    scoreBreakdown.push({ label, value, detail });
+    scoreBreakdown.push(detail === undefined ? { label, value } : { label, value, detail });
   }
   return value;
 }

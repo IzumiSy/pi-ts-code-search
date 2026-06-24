@@ -384,6 +384,10 @@ export function useAutoLogin() {
     const [firstHit] = details.hits ?? [];
 
     expect(details.explain).toBe(true);
+    expect(firstHit).toBeDefined();
+    if (!firstHit) {
+      throw new Error("Expected at least one hit");
+    }
     expect(firstHit.scoreBreakdown).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "MiniSearch base" }),
